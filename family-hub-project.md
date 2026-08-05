@@ -28,7 +28,7 @@
 |-------|-------------|--------|
 | 1 — Design | Iterate on UI/UX mockups to nail look and feel | ✅ Complete |
 | 2 — Navigable mockup | Interactive mockup with dummy data, all panels clickable | ✅ Complete |
-| 3 — Real data | Convert to React, wire up Google APIs, deploy | 🔄 Up next |
+| 3 — Real data | Convert to React, wire up Google APIs, deploy | 🔄 In progress — repo/scaffold/deploy pipeline live, panel conversion + APIs next |
 | 4 — Smart home (optional) | Add Home Assistant hybrid for device control | Not started |
 
 ---
@@ -86,9 +86,7 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 
 | # | Task | Phase | Notes |
 |---|------|-------|-------|
-| T-01 | Set up GitHub repo | Phase 3 | Create repo, push d.2.5 as reference, set up GitHub Pages |
-| T-02 | Convert to React app with Vite | Phase 3 | Use Claude Code. Scaffold app, convert each panel to component. |
-| T-03 | Deploy to GitHub Pages | Phase 3 | Get live URL before OAuth setup |
+| T-02b | Convert each mockup panel to a React component | Phase 3 | Scaffold is live but still the default Vite template — Home/Calendar/Tasks/Groceries/Chores/Settings panels from family-hub-d2.5.html still need to be ported in, along with the CSS-variable theme system. Do this as its own focused pass (mockup CSS alone is large). |
 | T-04 | Set up Google Cloud project + OAuth | Phase 3 | One-time trickiest step. Unlocks all Google APIs. |
 | T-05 | Wire up weather (Open-Meteo) | Phase 3 | Free, no auth. Westminster, CO coords. Replace dummy weather data. |
 | T-06 | Wire up Google Calendar API | Phase 3 | Month + week + agenda views. Enable person filter. |
@@ -115,6 +113,9 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 | — | Choose Home Assistant vs React app | 2026-03-20 | React app chosen; HA deferred to Phase 4 |
 | — | Design phase (d.1.0 → d.1.5) | 2026-03-20 | Layout, nav, calendar, weather, home control, family names |
 | — | Navigable mockup (d.2.0 → d.2.5) | 2026-05-16 | All panels functional, dual theme, settings panel, syntax errors fixed |
+| T-01 | Set up GitHub repo | 2026-08-05 | Public repo at github.com/treysimpson/family-hub (public needed for free GitHub Pages) |
+| T-02 | Scaffold Vite + React app | 2026-08-05 | Vite/React scaffold merged into repo root, base path set to `/family-hub/`. Panel conversion from mockup tracked separately as T-02b. |
+| T-03 | Deploy skeleton to GitHub Pages | 2026-08-05 | Live at https://treysimpson.github.io/family-hub/ via GitHub Actions (deploys automatically on push to master) |
 
 ---
 
