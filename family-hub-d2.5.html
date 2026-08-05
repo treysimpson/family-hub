@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Hub — d2.5</title>
+<style>
+/* ══════════════════════════════════════════
+   DARK THEME (default)
+══════════════════════════════════════════ */
+:root, [data-theme="dark"] {
+  --bg-page:         radial-gradient(ellipse at 30% 20%, #1a1040 0%, #050810 60%);
+  --bg-screen:       linear-gradient(135deg,#0a0b14 0%,#0d1020 40%,#0a0e1a 100%);
+  --bg-topbar:       rgba(5,6,15,0.6);
+  --bg-card:         rgba(255,255,255,0.05);
+  --bg-card-hover:   rgba(255,255,255,0.08);
+  --bg-sidebar:      rgba(5,6,15,0.5);
+  --bg-input:        rgba(255,255,255,0.06);
+  --bg-person-card:  rgba(255,255,255,0.04);
+  --bg-item:         rgba(255,255,255,0.04);
+  --bg-item-hover:   rgba(255,255,255,0.07);
+  --bg-hc-room:      rgba(255,255,255,0.04);
+  --bg-hc-device:    rgba(255,255,255,0.03);
+  --bg-hc-device-on: rgba(255,200,60,0.08);
+  --bg-notif:        rgba(255,255,255,0.05);
+  --bg-wx-stat:      rgba(255,255,255,0.04);
+  --bg-wx-hour:      rgba(255,255,255,0.04);
+  --bg-wx-day:       rgba(255,255,255,0.04);
+  --bg-panel:        rgba(13,15,20,0.95);
+  --bg-freq-chip:    rgba(255,255,255,0.04);
+  --bg-agent:        rgba(13,15,20,0.95);
+  --bg-agent-item:   rgba(32,201,163,0.07);
+  --bg-settings:     rgba(13,15,20,0.97);
+  --bg-cal-cell:     rgba(255,255,255,0.025);
+  --bg-cal-today:    rgba(108,127,232,0.1);
+  --bg-week-header:  rgba(255,255,255,0.03);
+  --bg-week-today:   rgba(108,127,232,0.12);
+  --bg-chore-item:   rgba(255,255,255,0.025);
+  --bg-toggle-off:   rgba(255,255,255,0.12);
+  --bg-therm:        rgba(108,127,232,0.08);
+  --bg-garage:       rgba(255,255,255,0.03);
+  --bg-garage-open:  rgba(32,201,163,0.08);
+  --bg-cam:          rgba(255,255,255,0.03);
+
+  --border-screen:   rgba(255,255,255,0.06);
+  --border-topbar:   rgba(108,127,232,0.15);
+  --border-card:     rgba(108,127,232,0.15);
+  --border-sidebar:  rgba(108,127,232,0.12);
+  --border-main-col: rgba(255,255,255,0.05);
+  --border-input:    rgba(255,255,255,0.1);
+  --border-item:     rgba(255,255,255,0.07);
+  --border-notif:    rgba(255,255,255,0.1);
+  --border-panel:    rgba(255,255,255,0.1);
+  --border-divider:  rgba(255,255,255,0.07);
+  --border-person:   rgba(255,255,255,0.07);
+  --border-cal-cell: rgba(255,255,255,0.04);
+  --border-cal-today:rgba(108,127,232,0.5);
+  --border-week-hdr: rgba(255,255,255,0.05);
+  --border-week-today:rgba(108,127,232,0.35);
+  --border-wx-day:   rgba(255,255,255,0.07);
+  --border-freq:     rgba(255,255,255,0.08);
+  --border-agent:    rgba(255,255,255,0.12);
+  --border-agent-item:rgba(32,201,163,0.18);
+  --border-settings: rgba(255,255,255,0.1);
+  --border-therm:    rgba(108,127,232,0.2);
+  --border-garage:   rgba(255,255,255,0.07);
+  --border-garage-open:rgba(32,201,163,0.25);
+  --border-cam:      rgba(255,255,255,0.06);
+  --border-hc-device:rgba(255,255,255,0.06);
+  --border-hc-device-on:rgba(255,200,60,0.2);
+
+  --text-primary:    rgba(255,255,255,0.88);
+  --text-secondary:  rgba(255,255,255,0.42);
+  --text-muted:      rgba(255,255,255,0.22);
+  --text-time:       #ffffff;
+  --text-heading:    rgba(255,255,255,0.85);
+  --text-label:      rgba(255,255,255,0.28);
+  --text-done:       rgba(255,255,255,0.2);
+  --text-input:      rgba(255,255,255,0.7);
+  --text-today:      #A0ADFF;
+  --text-other-cal:  rgba(255,255,255,0.12);
+  --text-nav:        rgba(255,255,255,0.38);
+  --text-nav-active: #C0CAFF;
+
+  --accent-primary:  #6C7FE8;
+  --accent-teal:     #20C9A3;
+  --accent-coral:    #FF6B5A;
+  --accent-purple:   #6C7FE8;
+  --accent-amber:    #FFD060;
+  --accent-badge:    #6C7FE8;
+  --accent-check:    #20C9A3;
+  --accent-device-on:#FFD060;
+  --accent-toggle-on:rgba(255,200,60,0.6);
+  --accent-garage-open:#5FD9BC;
+  --accent-cam-badge:#5FD9BC;
+
+  --ev-teal-bg:      rgba(32,201,163,0.2);   --ev-teal-tx:    #5FD9BC;
+  --ev-coral-bg:     rgba(255,107,90,0.2);    --ev-coral-tx:   #FF8A78;
+  --ev-purple-bg:    rgba(108,127,232,0.2);   --ev-purple-tx:  #A0ADFF;
+  --ev-teal-week-bg: rgba(32,201,163,0.12);   --ev-teal-week-bd:#20C9A3;   --ev-teal-week-tx:#8FE8D4;
+  --ev-coral-week-bg:rgba(255,107,90,0.12);   --ev-coral-week-bd:#FF6B5A;  --ev-coral-week-tx:#FFADA4;
+  --ev-purp-week-bg: rgba(108,127,232,0.12);  --ev-purp-week-bd:#6C7FE8;   --ev-purp-week-tx:#B8C2FF;
+
+  --tag-trey-bg:     rgba(32,201,163,0.15);   --tag-trey-tx:   #5FD9BC;
+  --tag-beryl-bg:    rgba(108,127,232,0.15);  --tag-beryl-tx:  #A0ADFF;
+  --tag-kids-bg:     rgba(255,200,60,0.1);    --tag-kids-tx:   #FFD060;
+  --tag-family-bg:   rgba(255,107,90,0.12);   --tag-family-tx: #FF8A78;
+
+  --person-trey:     #20C9A3;
+  --person-beryl:    #A0ADFF;
+  --person-bryce:    #FF8A78;
+  --person-emery:    #FFD060;
+
+  --fpill-on-default-bg: rgba(108,127,232,0.15); --fpill-on-default-tx: #A0ADFF;
+  --fpill-teal-bg:   rgba(32,201,163,0.12);   --fpill-teal-tx: #5FD9BC;   --fpill-teal-bd: rgba(32,201,163,0.3);
+  --fpill-coral-bg:  rgba(255,107,90,0.12);   --fpill-coral-tx:#FF8A78;   --fpill-coral-bd:rgba(255,107,90,0.3);
+  --fpill-purple-bg: rgba(108,127,232,0.12);  --fpill-purple-tx:#A0ADFF;  --fpill-purple-bd:rgba(108,127,232,0.3);
+  --fpill-amber-bg:  rgba(255,200,60,0.1);    --fpill-amber-tx:#FFD060;   --fpill-amber-bd:rgba(255,200,60,0.25);
+
+  --cpill-trey-bg:   rgba(32,201,163,0.12);   --cpill-trey-tx: #5FD9BC;   --cpill-trey-bd: rgba(32,201,163,0.3);
+  --cpill-beryl-bg:  rgba(108,127,232,0.12);  --cpill-beryl-tx:#A0ADFF;   --cpill-beryl-bd:rgba(108,127,232,0.3);
+  --cpill-kids-bg:   rgba(255,200,60,0.08);   --cpill-kids-tx: #FFD060;   --cpill-kids-bd: rgba(255,200,60,0.2);
+  --cpill-fam-bg:    rgba(255,107,90,0.1);    --cpill-fam-tx:  #FF8A78;   --cpill-fam-bd:  rgba(255,107,90,0.25);
+
+  --wx-bar-gradient: linear-gradient(to right,#6C7FE8,#20C9A3);
+  --card-shadow:     0 4px 24px rgba(0,0,0,0.4),inset 0 0.5px 0 rgba(255,255,255,0.08);
+  --card-radius:     14px;
+  --btn-radius:      7px;
+  --pill-radius:     8px;
+  --item-radius:     10px;
+
+  --font-weight-time:  200;
+  --font-weight-nav:   400;
+  --font-weight-card-label: 500;
+  --font-weight-heading: 400;
+  --font-weight-body:  400;
+  --letter-spacing-time: -2px;
+  --time-shadow:     0 0 30px rgba(108,127,232,0.4);
+
+  --settings-toggle-bg: rgba(108,127,232,0.2);
+  --settings-toggle-bd: rgba(108,127,232,0.4);
+  --settings-toggle-tx: #A0ADFF;
+  --theme-btn-active-bg: rgba(108,127,232,0.25);
+  --theme-btn-active-bd: rgba(108,127,232,0.5);
+  --theme-btn-active-tx: #C0CAFF;
+}
+
+/* ══════════════════════════════════════════
+   LIGHT THEME
+══════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg-page:         #e8e0d5;
+  --bg-screen:       #f7f3ee;
+  --bg-topbar:       #fffdf9;
+  --bg-card:         #fffdf9;
+  --bg-card-hover:   #faf6f1;
+  --bg-sidebar:      #fffdf9;
+  --bg-input:        #faf6f1;
+  --bg-person-card:  #faf6f1;
+  --bg-item:         #fffdf9;
+  --bg-item-hover:   #faf6f1;
+  --bg-hc-room:      #fffdf9;
+  --bg-hc-device:    #faf6f1;
+  --bg-hc-device-on: #fef3ed;
+  --bg-notif:        #fffdf9;
+  --bg-wx-stat:      #fffdf9;
+  --bg-wx-hour:      #fffdf9;
+  --bg-wx-day:       #fffdf9;
+  --bg-panel:        #fffdf9;
+  --bg-freq-chip:    #faf6f1;
+  --bg-agent:        #fffdf9;
+  --bg-agent-item:   #faf6f1;
+  --bg-settings:     #fffdf9;
+  --bg-cal-cell:     #faf6f1;
+  --bg-cal-today:    #fef3ed;
+  --bg-week-header:  #faf6f1;
+  --bg-week-today:   #fef3ed;
+  --bg-chore-item:   #faf6f1;
+  --bg-toggle-off:   #ddd5c8;
+  --bg-therm:        #eef5f2;
+  --bg-garage:       #faf6f1;
+  --bg-garage-open:  #eef5f2;
+  --bg-cam:          #faf6f1;
+
+  --border-screen:   none;
+  --border-topbar:   #ede6db;
+  --border-card:     #ede6db;
+  --border-sidebar:  #ede6db;
+  --border-main-col: #ede6db;
+  --border-input:    #e0d8cc;
+  --border-item:     #ede6db;
+  --border-notif:    #e0d8cc;
+  --border-panel:    #ede6db;
+  --border-divider:  #ede6db;
+  --border-person:   #ede6db;
+  --border-cal-cell: transparent;
+  --border-cal-today:#E07B54;
+  --border-week-hdr: transparent;
+  --border-week-today:#E07B54;
+  --border-wx-day:   #ede6db;
+  --border-freq:     #e0d8cc;
+  --border-agent:    #ede6db;
+  --border-agent-item:#ede6db;
+  --border-settings: #ede6db;
+  --border-therm:    #b8ddd0;
+  --border-garage:   #ede6db;
+  --border-garage-open:#b8ddd0;
+  --border-cam:      #ede6db;
+  --border-hc-device:#ede6db;
+  --border-hc-device-on:#f0c4a8;
+
+  --text-primary:    #2d2820;
+  --text-secondary:  #a89880;
+  --text-muted:      #c4b49e;
+  --text-time:       #2d2820;
+  --text-heading:    #2d2820;
+  --text-label:      #c4b49e;
+  --text-done:       #c4b49e;
+  --text-input:      #2d2820;
+  --text-today:      #E07B54;
+  --text-other-cal:  #ddd5c8;
+  --text-nav:        #a89880;
+  --text-nav-active: #fffdf9;
+
+  --accent-primary:  #E07B54;
+  --accent-teal:     #3a8c6e;
+  --accent-coral:    #E07B54;
+  --accent-purple:   #6e68b8;
+  --accent-amber:    #b87a30;
+  --accent-badge:    #E07B54;
+  --accent-check:    #3a8c6e;
+  --accent-device-on:#c4623a;
+  --accent-toggle-on:#E07B54;
+  --accent-garage-open:#3a8c6e;
+  --accent-cam-badge:#3a8c6e;
+
+  --ev-teal-bg:      #d4ede6;  --ev-teal-tx:    #3a8c6e;
+  --ev-coral-bg:     #fde8dd;  --ev-coral-tx:   #c4623a;
+  --ev-purple-bg:    #e8e4f5;  --ev-purple-tx:  #6e68b8;
+  --ev-teal-week-bg: #d4ede6;  --ev-teal-week-bd:#3a8c6e;  --ev-teal-week-tx:#2d6b54;
+  --ev-coral-week-bg:#fde8dd;  --ev-coral-week-bd:#E07B54; --ev-coral-week-tx:#c4623a;
+  --ev-purp-week-bg: #e8e4f5;  --ev-purp-week-bd:#6e68b8;  --ev-purp-week-tx:#4e4a8a;
+
+  --tag-trey-bg:     #d4ede6;  --tag-trey-tx:   #3a8c6e;
+  --tag-beryl-bg:    #e8e4f5;  --tag-beryl-tx:  #6e68b8;
+  --tag-kids-bg:     #fdf3e0;  --tag-kids-tx:   #b87a30;
+  --tag-family-bg:   #fde8dd;  --tag-family-tx: #c4623a;
+
+  --person-trey:     #3a8c6e;
+  --person-beryl:    #6e68b8;
+  --person-bryce:    #E07B54;
+  --person-emery:    #b87a30;
+
+  --fpill-on-default-bg: #2d2820; --fpill-on-default-tx: #fffdf9;
+  --fpill-teal-bg:   #d4ede6;  --fpill-teal-tx: #3a8c6e;  --fpill-teal-bd: #b8ddd0;
+  --fpill-coral-bg:  #fde8dd;  --fpill-coral-tx:#c4623a;  --fpill-coral-bd:#f0c4a8;
+  --fpill-purple-bg: #e8e4f5;  --fpill-purple-tx:#6e68b8; --fpill-purple-bd:#c8c4e8;
+  --fpill-amber-bg:  #fdf3e0;  --fpill-amber-tx:#b87a30;  --fpill-amber-bd:#f0d8a8;
+
+  --cpill-trey-bg:   #d4ede6;  --cpill-trey-tx: #3a8c6e;  --cpill-trey-bd: #b8ddd0;
+  --cpill-beryl-bg:  #e8e4f5;  --cpill-beryl-tx:#6e68b8;  --cpill-beryl-bd:#c8c4e8;
+  --cpill-kids-bg:   #fdf3e0;  --cpill-kids-tx: #b87a30;  --cpill-kids-bd: #f0d8a8;
+  --cpill-fam-bg:    #fde8dd;  --cpill-fam-tx:  #c4623a;  --cpill-fam-bd:  #f0c4a8;
+
+  --wx-bar-gradient: linear-gradient(to right,#6e68b8,#E07B54);
+  --card-shadow:     0 2px 8px rgba(100,70,30,0.06);
+  --card-radius:     20px;
+  --btn-radius:      10px;
+  --pill-radius:     999px;
+  --item-radius:     14px;
+
+  --font-weight-time:  600;
+  --font-weight-nav:   500;
+  --font-weight-card-label: 700;
+  --font-weight-heading: 700;
+  --font-weight-body:  500;
+  --letter-spacing-time: -1px;
+  --time-shadow:     none;
+
+  --settings-toggle-bg: #2d2820;
+  --settings-toggle-bd: #2d2820;
+  --settings-toggle-tx: #fffdf9;
+  --theme-btn-active-bg: #2d2820;
+  --theme-btn-active-bd: #2d2820;
+  --theme-btn-active-tx: #fffdf9;
+}
+
+/* ══════════════════════════════════════════
+   SHARED STYLES (use CSS variables throughout)
+══════════════════════════════════════════ */
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;height:100%;background:var(--bg-page);display:flex;justify-content:center;align-items:center;overflow:hidden;}
+  .aspect-wrap{position:relative;width:100%;max-width:calc(100vh * 16/9);}
+  .aspect-wrap::before{content:'';display:block;padding-top:56.25%;}
+  .screen{position:absolute;inset:0;background:var(--bg-screen);color:var(--text-primary);font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--border-screen);font-size:clamp(9px,1.1vw,14px);}
+  [data-theme="light"] .screen{border-radius:18px;box-shadow:0 8px 40px rgba(100,70,30,0.18);font-family:'Georgia',system-ui,sans-serif;}
+
+  /* ── Top bar ── */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 1.3em;height:9%;border-bottom:0.5px solid var(--border-topbar);background:var(--bg-topbar);backdrop-filter:blur(20px);flex-shrink:0;}
+  .topbar-left{display:flex;align-items:baseline;gap:0.7em;}
+  .time{font-size:2.1em;font-weight:var(--font-weight-time);color:var(--text-time);letter-spacing:var(--letter-spacing-time);text-shadow:var(--time-shadow);}
+  .date{font-size:0.95em;color:var(--text-secondary);font-weight:300;letter-spacing:0.01em;}
+  .topbar-center{display:flex;gap:0.35em;}
+  .nav-pill{padding:0.32em 0.9em;border-radius:var(--pill-radius);font-size:0.82em;border:0.5px solid var(--border-item);color:var(--text-nav);cursor:pointer;background:transparent;user-select:none;letter-spacing:0.01em;transition:all 0.15s;}
+  .nav-pill.active{background:var(--theme-btn-active-bg);color:var(--theme-btn-active-tx);border-color:var(--theme-btn-active-bd);}
+  .topbar-right{display:flex;align-items:center;gap:1em;}
+  .weather-inline{display:flex;align-items:center;gap:0.5em;cursor:pointer;}
+  .weather-temp{font-size:1.1em;font-weight:var(--font-weight-time);color:var(--text-time);letter-spacing:-0.5px;}
+  .weather-sub{font-size:0.8em;color:var(--text-secondary);}
+  .notif-btn{position:relative;width:2.2em;height:2.2em;border-radius:var(--btn-radius);border:0.5px solid var(--border-notif);background:var(--bg-notif);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .notif-badge{position:absolute;top:0.1em;right:0.1em;width:1em;height:1em;border-radius:50%;background:var(--accent-badge);font-size:0.65em;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;}
+  .settings-btn{width:2.2em;height:2.2em;border-radius:var(--btn-radius);border:0.5px solid var(--border-notif);background:var(--bg-notif);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:1em;}
+
+  /* ── Pages ── */
+  .page{display:none;flex:1;min-height:0;}
+  .page.active{display:flex;}
+
+  /* ── Home layout ── */
+  #page-home{flex-direction:row;}
+  .main-col{padding:1em 1.1em;display:flex;flex-direction:column;gap:0.75em;border-right:0.5px solid var(--border-main-col);min-height:0;flex:1;}
+  .side-col{padding:1em 1.1em;display:flex;flex-direction:column;gap:0.75em;min-height:0;width:26%;}
+
+  /* ── Cards ── */
+  .card{background:var(--bg-card);backdrop-filter:blur(20px);border:0.5px solid var(--border-card);border-radius:var(--card-radius);padding:0.85em 1em;display:flex;flex-direction:column;min-height:0;box-shadow:var(--card-shadow);}
+  .card-label{font-size:0.68em;font-weight:var(--font-weight-card-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-label);margin-bottom:0.6em;flex-shrink:0;}
+  .card-fill{flex:1;min-height:0;overflow:hidden;}
+  .cal-card{flex:1;}
+  .tog{padding:0.25em 0.8em;border-radius:var(--btn-radius);font-size:0.82em;border:0.5px solid var(--border-item);color:var(--text-secondary);cursor:pointer;user-select:none;letter-spacing:0.01em;transition:all 0.15s;}
+  .tog.on{background:var(--fpill-purple-bg);color:var(--fpill-purple-tx);border-color:var(--fpill-purple-bd);}
+
+  /* ── Month view ── */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-dow{font-size:0.7em;color:var(--text-muted);text-align:center;padding:0.2em 0 0.45em;font-weight:var(--font-weight-card-label);letter-spacing:0.05em;}
+  .cal-cell{border-radius:var(--btn-radius);padding:0.28em 0.32em;border:0.5px solid var(--border-cal-cell);background:var(--bg-cal-cell);}
+  .cal-cell.today{border-color:var(--border-cal-today);background:var(--bg-cal-today);}
+  .cal-cell.other{background:transparent;border-color:transparent;}
+  .cal-num{font-size:0.76em;color:var(--text-secondary);margin-bottom:0.12em;font-weight:var(--font-weight-body);}
+  .today-num{color:var(--text-today);}
+  .other-num{color:var(--text-other-cal);}
+  .cal-ev{font-size:0.68em;border-radius:4px;padding:0.08em 0.3em;margin-bottom:0.12em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+  .ev-teal{background:var(--ev-teal-bg);color:var(--ev-teal-tx);}
+  .ev-coral{background:var(--ev-coral-bg);color:var(--ev-coral-tx);}
+  .ev-purple{background:var(--ev-purple-bg);color:var(--ev-purple-tx);}
+
+  /* ── Week view ── */
+  .week-grid{display:grid;gap:0.4em;height:100%;}
+  .week-grid.days7{grid-template-columns:repeat(7,1fr);}
+  .week-grid.days5{grid-template-columns:repeat(5,1fr);}
+  .week-day-col{display:flex;flex-direction:column;gap:0.22em;min-height:0;}
+  .week-day-header{border-radius:var(--item-radius);padding:0.38em 0.45em;flex-shrink:0;border:0.5px solid var(--border-week-hdr);background:var(--bg-week-header);}
+  .week-day-header.is-today{background:var(--bg-week-today);border-color:var(--border-week-today);}
+  .week-header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.18em;}
+  .week-dow{font-size:0.68em;color:var(--text-muted);font-weight:var(--font-weight-card-label);letter-spacing:0.06em;}
+  .week-day-header.is-today .week-dow{color:var(--text-today);}
+  .week-date{font-size:1.2em;font-weight:var(--font-weight-time);color:var(--text-secondary);line-height:1;letter-spacing:-0.5px;}
+  .week-day-header.is-today .week-date{color:var(--text-today);}
+  .week-wx{display:flex;align-items:center;gap:0.25em;margin-top:0.22em;padding-top:0.22em;border-top:0.5px solid var(--border-divider);}
+  .wx-ic{font-size:0.9em;line-height:1;} .wx-hi{font-size:0.75em;font-weight:500;color:var(--text-primary);} .wx-lo{font-size:0.7em;color:var(--text-muted);} .wx-sep{font-size:0.65em;color:var(--text-muted);margin:0 0.08em;}
+  .week-events{display:flex;flex-direction:column;gap:0.18em;flex:1;min-height:0;overflow:hidden;}
+  .week-ev{border-radius:6px;padding:0.22em 0.4em;font-size:0.74em;line-height:1.3;flex-shrink:0;cursor:pointer;}
+  .week-ev .ev-time{font-size:0.82em;opacity:0.55;display:block;margin-bottom:0.02em;}
+  .week-ev .ev-title{font-weight:var(--font-weight-body);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .week-ev .ev-who{font-size:0.76em;opacity:0.45;display:block;}
+  .week-ev.ev-teal{background:var(--ev-teal-week-bg);border-left:2px solid var(--ev-teal-week-bd);color:var(--ev-teal-week-tx);}
+  .week-ev.ev-coral{background:var(--ev-coral-week-bg);border-left:2px solid var(--ev-coral-week-bd);color:var(--ev-coral-week-tx);}
+  .week-ev.ev-purple{background:var(--ev-purp-week-bg);border-left:2px solid var(--ev-purp-week-bd);color:var(--ev-purp-week-tx);}
+
+  /* ── Agenda ── */
+  .agenda{display:flex;flex-direction:column;gap:0.4em;overflow:hidden;}
+  .ag-day{font-size:0.68em;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:0.45em;margin-bottom:0.1em;font-weight:var(--font-weight-card-label);}
+  .ag-row{display:flex;align-items:flex-start;gap:0.5em;cursor:pointer;}
+  .ag-time{font-size:0.76em;color:var(--text-muted);min-width:2.8em;padding-top:0.15em;}
+  .ag-dot{width:0.48em;height:0.48em;border-radius:50%;margin-top:0.35em;flex-shrink:0;}
+  .ag-text{font-size:0.88em;color:var(--text-primary);font-weight:var(--font-weight-body);}
+  .ag-who{font-size:0.76em;color:var(--text-muted);}
+
+  /* ── Sidebar person cards ── */
+  .person-card{background:var(--bg-person-card);border:0.5px solid var(--border-person);border-radius:var(--item-radius);padding:0.62em 0.8em;margin-bottom:0.45em;}
+  .person-card:last-child{margin-bottom:0;}
+  .person-header{display:flex;align-items:center;gap:0.5em;margin-bottom:0.38em;}
+  .person-dot{width:0.58em;height:0.58em;border-radius:50%;flex-shrink:0;}
+  .person-name{font-size:0.88em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .person-next{font-size:0.78em;color:var(--text-muted);margin-left:auto;}
+  .person-todo{display:flex;align-items:center;gap:0.45em;font-size:0.78em;color:var(--text-secondary);margin-bottom:0.22em;cursor:pointer;}
+  .mini-check{width:0.75em;height:0.75em;border-radius:2px;border:1px solid var(--border-item);flex-shrink:0;}
+  .g-item{display:flex;align-items:center;gap:0.5em;font-size:0.88em;color:var(--text-primary);margin-bottom:0.32em;cursor:pointer;}
+  .check-box{width:0.9em;height:0.9em;border-radius:3px;border:1px solid var(--border-item);flex-shrink:0;}
+  .check-box.done{background:var(--accent-check);border-color:var(--accent-check);}
+  .g-text.done{color:var(--text-done);text-decoration:line-through;}
+  .add-row{display:flex;align-items:center;gap:0.4em;margin-top:0.5em;padding-top:0.5em;border-top:0.5px solid var(--border-divider);}
+  .add-input{flex:1;background:var(--bg-input);border:0.5px solid var(--border-input);border-radius:var(--btn-radius);color:var(--text-input);font-size:0.88em;padding:0.35em 0.55em;outline:none;font-size:0.95em;height:2.2em;}
+  .add-btn{font-size:0.82em;padding:0.35em 0.75em;border-radius:var(--btn-radius);background:var(--settings-toggle-bg);border:0.5px solid var(--settings-toggle-bd);color:var(--settings-toggle-tx);cursor:pointer;font-weight:var(--font-weight-heading);white-space:nowrap;}
+
+  /* ── Home Control ── */
+  #page-home-control{flex-direction:column;padding:1em 1.2em;gap:0.85em;overflow:hidden;}
+  .hc-rooms{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75em;flex:1;min-height:0;}
+  .hc-room{background:var(--bg-hc-room);backdrop-filter:blur(20px);border:0.5px solid var(--border-card);border-radius:var(--card-radius);padding:0.85em;display:flex;flex-direction:column;gap:0.45em;min-height:0;box-shadow:var(--card-shadow);}
+  .hc-room-name{font-size:0.78em;font-weight:var(--font-weight-heading);color:var(--text-primary);letter-spacing:0.02em;padding-bottom:0.4em;border-bottom:0.5px solid var(--border-divider);flex-shrink:0;}
+  .hc-devices{display:flex;flex-direction:column;gap:0.38em;flex:1;min-height:0;}
+  .hc-device{display:flex;align-items:center;gap:0.6em;padding:0.42em 0.5em;border-radius:var(--item-radius);background:var(--bg-hc-device);border:0.5px solid var(--border-hc-device);cursor:pointer;transition:all 0.15s;}
+  .hc-device:hover{background:var(--bg-item-hover);}
+  .hc-device.on{background:var(--bg-hc-device-on);border-color:var(--border-hc-device-on);}
+  .hc-device-icon{font-size:0.95em;width:1.35em;text-align:center;flex-shrink:0;}
+  .hc-device-name{font-size:0.8em;color:var(--text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hc-device.on .hc-device-name{color:var(--accent-device-on);}
+  .hc-toggle{width:2em;height:1.1em;border-radius:999px;background:var(--bg-toggle-off);position:relative;flex-shrink:0;transition:background 0.2s;}
+  .hc-toggle.on{background:var(--accent-toggle-on);}
+  .hc-toggle::after{content:'';position:absolute;top:0.14em;left:0.14em;width:0.82em;height:0.82em;border-radius:50%;background:rgba(255,255,255,0.8);transition:transform 0.2s,background 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+  .hc-toggle.on::after{transform:translateX(0.88em);background:#fff;}
+  .hc-dim-wrap{padding:0 0.5em 0.28em;display:none;}
+  .hc-dim-wrap.show{display:block;}
+  .hc-dim-label{display:flex;justify-content:space-between;font-size:0.7em;color:var(--text-muted);margin-bottom:0.2em;}
+  .hc-dim-slider{width:100%;accent-color:var(--accent-device-on);}
+  .hc-therm{display:flex;align-items:center;gap:0.5em;padding:0.5em;border-radius:var(--item-radius);background:var(--bg-therm);border:0.5px solid var(--border-therm);}
+  .hc-therm-icon{font-size:1.05em;}
+  .hc-therm-info{flex:1;}
+  .hc-therm-name{font-size:0.8em;color:var(--fpill-purple-tx);font-weight:var(--font-weight-heading);}
+  .hc-therm-val{font-size:0.73em;color:var(--text-muted);}
+  .hc-therm-btns{display:flex;gap:0.28em;}
+  .hc-therm-btn{width:1.6em;height:1.6em;border-radius:50%;border:0.5px solid var(--border-therm);background:var(--bg-input);color:var(--fpill-purple-tx);font-size:0.88em;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .hc-garage{display:flex;align-items:center;gap:0.6em;padding:0.5em;border-radius:var(--item-radius);border:0.5px solid var(--border-garage);background:var(--bg-garage);}
+  .hc-garage.open{background:var(--bg-garage-open);border-color:var(--border-garage-open);}
+  .hc-garage-icon{font-size:1.15em;}
+  .hc-garage-info{flex:1;}
+  .hc-garage-name{font-size:0.8em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .hc-garage.open .hc-garage-name{color:var(--accent-garage-open);}
+  .hc-garage-status{font-size:0.7em;color:var(--text-muted);}
+  .hc-garage.open .hc-garage-status{color:var(--accent-garage-open);}
+  .hc-garage-btn{padding:0.25em 0.7em;border-radius:var(--btn-radius);font-size:0.76em;border:0.5px solid var(--border-item);background:var(--bg-input);color:var(--text-primary);cursor:pointer;}
+  .hc-garage.open .hc-garage-btn{border-color:var(--border-garage-open);background:var(--bg-garage-open);color:var(--accent-garage-open);}
+  .hc-cam{display:flex;align-items:center;gap:0.5em;padding:0.42em 0.5em;border-radius:var(--item-radius);background:var(--bg-cam);border:0.5px solid var(--border-cam);}
+  .hc-cam-icon{font-size:0.95em;} .hc-cam-name{font-size:0.8em;color:var(--text-primary);flex:1;}
+  .hc-cam-badge{font-size:0.68em;padding:0.12em 0.45em;border-radius:6px;background:var(--ev-teal-bg);color:var(--accent-cam-badge);border:0.5px solid var(--border-therm);}
+  .hc-quickbar{display:flex;gap:0.55em;flex-shrink:0;}
+  .hc-quick{flex:1;padding:0.52em 0.6em;border-radius:var(--item-radius);background:var(--bg-card);border:0.5px solid var(--border-card);display:flex;align-items:center;gap:0.45em;cursor:pointer;transition:all 0.15s;box-shadow:var(--card-shadow);}
+  .hc-quick:hover{background:var(--bg-item-hover);}
+  .hc-quick.active{background:var(--bg-hc-device-on);border-color:var(--border-hc-device-on);}
+  .hc-quick-icon{font-size:1.05em;}
+  .hc-quick-label{font-size:0.8em;color:var(--text-secondary);font-weight:var(--font-weight-heading);}
+  .hc-quick.active .hc-quick-label{color:var(--accent-device-on);}
+
+  /* ── Weather page ── */
+  #page-weather{flex-direction:column;padding:1.2em 1.6em;gap:1em;}
+  .wx-hero{display:flex;align-items:center;gap:2em;flex-shrink:0;}
+  .wx-hero-temp{font-size:4.5em;font-weight:var(--font-weight-time);color:var(--text-time);line-height:1;letter-spacing:-3px;}
+  .wx-hero-icon{font-size:3.5em;line-height:1;}
+  .wx-hero-info{display:flex;flex-direction:column;gap:0.2em;}
+  .wx-hero-desc{font-size:1.1em;color:var(--text-primary);font-weight:var(--font-weight-heading);}
+  .wx-hero-loc{font-size:0.9em;color:var(--text-muted);}
+  .wx-hero-feels{font-size:0.85em;color:var(--text-muted);}
+  .wx-stats{display:flex;gap:0.7em;flex-shrink:0;}
+  .wx-stat{background:var(--bg-wx-stat);backdrop-filter:blur(20px);border:0.5px solid var(--border-card);border-radius:var(--item-radius);padding:0.6em 1em;text-align:center;flex:1;box-shadow:var(--card-shadow);}
+  .wx-stat-label{font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2em;font-weight:var(--font-weight-card-label);}
+  .wx-stat-val{font-size:0.95em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .wx-section-label{font-size:0.7em;font-weight:var(--font-weight-card-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5em;}
+  .wx-hourly{display:flex;gap:0.45em;overflow:hidden;}
+  .wx-hour{flex:1;background:var(--bg-wx-hour);border:0.5px solid var(--border-card);border-radius:var(--item-radius);padding:0.5em 0.3em;text-align:center;}
+  .wx-hour-time{font-size:0.7em;color:var(--text-muted);margin-bottom:0.3em;}
+  .wx-hour-ic{font-size:1.05em;margin-bottom:0.2em;}
+  .wx-hour-temp{font-size:0.82em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .wx-hour-pop{font-size:0.68em;color:var(--ev-purple-tx);}
+  .wx-daily{display:flex;flex-direction:column;gap:0.35em;flex:1;}
+  .wx-day-row{display:flex;align-items:center;gap:1em;background:var(--bg-wx-day);border:0.5px solid var(--border-wx-day);border-radius:var(--item-radius);padding:0.52em 1em;cursor:pointer;transition:background 0.15s;box-shadow:var(--card-shadow);}
+  .wx-day-row:hover{background:var(--bg-item-hover);}
+  .wx-day-name{font-size:0.88em;font-weight:var(--font-weight-heading);color:var(--text-primary);min-width:3.5em;}
+  .wx-day-desc{font-size:0.8em;color:var(--text-secondary);flex:1;}
+  .wx-day-ic{font-size:1.05em;min-width:1.5em;text-align:center;}
+  .wx-day-hi{font-size:0.88em;font-weight:var(--font-weight-heading);color:var(--text-primary);min-width:2.5em;text-align:right;}
+  .wx-day-lo{font-size:0.8em;color:var(--text-muted);min-width:2.5em;text-align:right;}
+  .wx-bar-wrap{flex:1;height:4px;background:var(--border-divider);border-radius:2px;overflow:hidden;}
+  .wx-bar{height:100%;border-radius:2px;background:var(--wx-bar-gradient);}
+
+  /* ── Full-page panel shared layout ── */
+  .full-page{flex-direction:row;flex:1;min-height:0;}
+  .fp-sidebar{width:18em;flex-shrink:0;border-right:0.5px solid var(--border-sidebar);padding:1.1em;display:flex;flex-direction:column;gap:0.6em;background:var(--bg-sidebar);backdrop-filter:blur(20px);}
+  .fp-main{flex:1;padding:1.1em;display:flex;flex-direction:column;gap:0.75em;min-height:0;}
+  .fp-title{font-size:1.1em;font-weight:var(--font-weight-heading);color:var(--text-primary);margin-bottom:0.15em;}
+  .fp-subtitle{font-size:0.8em;color:var(--text-secondary);}
+
+  /* ── Filter pills — FIXED contrast ── */
+  .fpill{padding:0.28em 0.85em;border-radius:var(--pill-radius);font-size:0.82em;border:0.5px solid var(--border-item);color:var(--text-secondary);cursor:pointer;user-select:none;transition:all 0.15s;font-weight:var(--font-weight-body);}
+  .fpill.on{border-color:var(--fpill-purple-bd);}
+  .fpill:not(.on){opacity:0.55;color:var(--text-primary);}
+  .fpill.teal.on{background:var(--fpill-teal-bg);color:var(--fpill-teal-tx);border-color:var(--fpill-teal-bd);}
+  .fpill.coral.on{background:var(--fpill-coral-bg);color:var(--fpill-coral-tx);border-color:var(--fpill-coral-bd);}
+  .fpill.purple.on{background:var(--fpill-purple-bg);color:var(--fpill-purple-tx);border-color:var(--fpill-purple-bd);}
+  .fpill.amber.on{background:var(--fpill-amber-bg);color:var(--fpill-amber-tx);border-color:var(--fpill-amber-bd);}
+  .fpill:not(.teal):not(.coral):not(.purple):not(.amber).on{background:var(--fpill-on-default-bg);color:var(--fpill-on-default-tx);}
+
+  /* Filter section label — fixed contrast */
+  .filter-section-label{font-size:0.72em;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-secondary);margin:0.4em 0 0.3em;}
+
+  /* ── Task items ── */
+  .task-section-head{font-size:0.68em;font-weight:var(--font-weight-card-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-secondary);margin:0.85em 0 0.4em;flex-shrink:0;}
+  .task-section-head:first-child{margin-top:0;}
+  .task-scroll{overflow-y:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:0.3em;padding-right:0.2em;}
+  .task-scroll::-webkit-scrollbar{width:2px;}
+  .task-scroll::-webkit-scrollbar-thumb{background:var(--border-item);border-radius:2px;}
+  .task-item{display:flex;align-items:flex-start;gap:0.6em;padding:0.58em 0.75em;background:var(--bg-item);border:0.5px solid var(--border-item);border-radius:var(--item-radius);cursor:pointer;transition:background 0.15s;}
+  .task-item:hover{background:var(--bg-item-hover);}
+  .task-item.done{opacity:0.35;}
+  .task-cb{width:1em;height:1em;border-radius:3px;border:1px solid var(--border-item);flex-shrink:0;margin-top:0.12em;}
+  .task-cb.checked{background:var(--accent-check);border-color:var(--accent-check);}
+  .task-text{flex:1;font-size:0.88em;color:var(--text-primary);line-height:1.35;font-weight:var(--font-weight-body);}
+  .task-item.done .task-text{text-decoration:line-through;color:var(--text-done);}
+  .task-meta{display:flex;align-items:center;gap:0.4em;margin-top:0.22em;}
+  .task-due{font-size:0.73em;color:var(--text-secondary);}
+  .task-due.overdue{color:var(--ev-coral-tx);}
+  .task-tag{font-size:0.7em;padding:0.08em 0.5em;border-radius:5px;font-weight:500;}
+  .tag-trey{background:var(--tag-trey-bg);color:var(--tag-trey-tx);}
+  .tag-beryl{background:var(--tag-beryl-bg);color:var(--tag-beryl-tx);}
+  .tag-kids{background:var(--tag-kids-bg);color:var(--tag-kids-tx);}
+  .tag-family{background:var(--tag-family-bg);color:var(--tag-family-tx);}
+
+  /* ── Grocery ── */
+  .grocery-list-full{display:flex;flex-direction:column;gap:0.28em;}
+  .grocery-section-head{font-size:0.68em;font-weight:var(--font-weight-card-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:0.45em;flex-shrink:0;}
+  .g-full-item{display:flex;align-items:center;gap:0.6em;padding:0.48em 0.72em;background:var(--bg-item);border:0.5px solid var(--border-item);border-radius:var(--item-radius);cursor:pointer;transition:background 0.15s;}
+  .g-full-item:hover{background:var(--bg-item-hover);}
+  .g-full-item.checked{opacity:0.35;}
+  .g-full-cb{width:1em;height:1em;border-radius:3px;border:1px solid var(--border-item);flex-shrink:0;}
+  .g-full-cb.on{background:var(--accent-check);border-color:var(--accent-check);}
+  .g-full-text{flex:1;font-size:0.88em;color:var(--text-primary);font-weight:var(--font-weight-body);}
+  .g-full-item.checked .g-full-text{text-decoration:line-through;color:var(--text-done);}
+  .g-full-cat{font-size:0.7em;color:var(--text-muted);}
+
+  /* ── Chores ── */
+  .chore-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.8em;flex:1;min-height:0;}
+  .chore-person{background:var(--bg-card);backdrop-filter:blur(20px);border:0.5px solid var(--border-card);border-radius:var(--card-radius);padding:0.85em;display:flex;flex-direction:column;gap:0.38em;box-shadow:var(--card-shadow);}
+  .chore-person-head{display:flex;align-items:center;gap:0.5em;padding-bottom:0.45em;border-bottom:0.5px solid var(--border-divider);flex-shrink:0;}
+  .chore-dot{width:0.55em;height:0.55em;border-radius:50%;flex-shrink:0;}
+  .chore-person-name{font-size:0.88em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .chore-score{font-size:0.78em;color:var(--text-secondary);margin-left:auto;}
+  .chore-item{display:flex;align-items:center;gap:0.5em;padding:0.38em 0.5em;border-radius:var(--btn-radius);background:var(--bg-chore-item);border:0.5px solid transparent;cursor:pointer;transition:background 0.15s;}
+  .chore-item:hover{background:var(--bg-item-hover);}
+  .chore-item.done{opacity:0.35;}
+  .chore-cb{width:0.88em;height:0.88em;border-radius:2px;border:1px solid var(--border-item);flex-shrink:0;}
+  .chore-cb.on{background:var(--accent-check);border-color:var(--accent-check);}
+  .chore-text{flex:1;font-size:0.83em;color:var(--text-primary);font-weight:var(--font-weight-body);}
+  .chore-item.done .chore-text{text-decoration:line-through;color:var(--text-done);}
+  .chore-freq{font-size:0.7em;color:var(--text-muted);}
+
+  /* ── Calendar full page ── */
+  #page-calendar{flex-direction:column;padding:1em;}
+
+  /* ── Calendar person filter ── */
+  .cpill{padding:0.22em 0.7em;border-radius:var(--pill-radius);font-size:0.78em;border:0.5px solid var(--border-item);color:var(--text-secondary);cursor:pointer;user-select:none;transition:all 0.15s;}
+  .cpill.on{color:var(--text-primary);}
+  .cpill.ctrey.on{background:var(--cpill-trey-bg);color:var(--cpill-trey-tx);border-color:var(--cpill-trey-bd);}
+  .cpill.cberyl.on{background:var(--cpill-beryl-bg);color:var(--cpill-beryl-tx);border-color:var(--cpill-beryl-bd);}
+  .cpill.ckids.on{background:var(--cpill-kids-bg);color:var(--cpill-kids-tx);border-color:var(--cpill-kids-bd);}
+  .cpill.cfamily.on{background:var(--cpill-fam-bg);color:var(--cpill-fam-tx);border-color:var(--cpill-fam-bd);}
+
+  /* ── Event detail panel ── */
+  #event-panel{position:absolute;top:9%;right:0;width:22em;height:91%;background:var(--bg-panel);backdrop-filter:blur(30px);border-left:0.5px solid var(--border-panel);display:flex;flex-direction:column;z-index:20;transform:translateX(100%);transition:transform 0.2s ease;}
+  #event-panel.open{transform:translateX(0);}
+  .ep-header{padding:1em 1.2em 0.8em;border-bottom:0.5px solid var(--border-divider);flex-shrink:0;}
+  .ep-close{float:right;font-size:1.1em;color:var(--text-muted);cursor:pointer;line-height:1;}
+  .ep-title{font-size:1.02em;font-weight:var(--font-weight-heading);color:var(--text-primary);margin-bottom:0.3em;padding-right:1.5em;}
+  .ep-cal{font-size:0.76em;color:var(--text-muted);}
+  .ep-body{padding:1em 1.2em;display:flex;flex-direction:column;gap:0.8em;overflow-y:auto;flex:1;}
+  .ep-row{display:flex;align-items:flex-start;gap:0.7em;}
+  .ep-icon{font-size:1em;width:1.4em;flex-shrink:0;margin-top:0.1em;text-align:center;}
+  .ep-label{font-size:0.7em;color:var(--text-muted);margin-bottom:0.15em;font-weight:var(--font-weight-card-label);text-transform:uppercase;letter-spacing:0.06em;}
+  .ep-val{font-size:0.88em;color:var(--text-primary);}
+  .ep-divider{height:0.5px;background:var(--border-divider);}
+
+  /* ── Frequent grocery items ── */
+  .freq-section{flex-shrink:0;padding-top:0.6em;border-top:0.5px solid var(--border-divider);margin-top:0.4em;}
+  .freq-label{font-size:0.68em;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5em;font-weight:var(--font-weight-card-label);}
+  .freq-chips{display:flex;flex-wrap:wrap;gap:0.32em;}
+  .freq-chip{padding:0.22em 0.65em;border-radius:var(--pill-radius);font-size:0.8em;background:var(--bg-freq-chip);border:0.5px solid var(--border-freq);color:var(--text-secondary);cursor:pointer;user-select:none;transition:all 0.15s;}
+  .freq-chip:hover{background:var(--fpill-purple-bg);border-color:var(--fpill-purple-bd);color:var(--fpill-purple-tx);}
+  .freq-chip.added{background:var(--fpill-teal-bg);border-color:var(--fpill-teal-bd);color:var(--fpill-teal-tx);}
+
+  /* ── Weather day detail panel ── */
+  #wx-day-panel{position:absolute;top:9%;right:0;width:20em;height:91%;background:var(--bg-panel);backdrop-filter:blur(30px);border-left:0.5px solid var(--border-panel);display:flex;flex-direction:column;z-index:20;transform:translateX(100%);transition:transform 0.2s ease;}
+  #wx-day-panel.open{transform:translateX(0);}
+  .wx-dp-header{padding:1em 1.2em 0.8em;border-bottom:0.5px solid var(--border-divider);flex-shrink:0;display:flex;align-items:center;gap:0.8em;}
+  .wx-dp-close{margin-left:auto;font-size:1.1em;color:var(--text-muted);cursor:pointer;}
+  .wx-dp-icon{font-size:2.5em;line-height:1;}
+  .wx-dp-day{font-size:1em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .wx-dp-desc{font-size:0.82em;color:var(--text-secondary);}
+  .wx-dp-body{padding:1em 1.2em;display:flex;flex-direction:column;gap:0.7em;overflow-y:auto;flex:1;}
+  .wx-dp-temps{display:flex;gap:1.5em;padding:0.85em;background:var(--bg-item);border-radius:var(--item-radius);border:0.5px solid var(--border-item);}
+  .wx-dp-temp-block{text-align:center;flex:1;}
+  .wx-dp-temp-label{font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.2em;font-weight:var(--font-weight-card-label);}
+  .wx-dp-temp-val{font-size:1.6em;font-weight:var(--font-weight-time);color:var(--text-primary);}
+  .wx-dp-stats{display:grid;grid-template-columns:1fr 1fr;gap:0.45em;}
+  .wx-dp-stat{background:var(--bg-item);border:0.5px solid var(--border-item);border-radius:var(--btn-radius);padding:0.5em 0.8em;}
+  .wx-dp-stat-label{font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.15em;font-weight:var(--font-weight-card-label);}
+  .wx-dp-stat-val{font-size:0.92em;font-weight:var(--font-weight-heading);color:var(--text-primary);}
+  .wx-dp-hourly{display:flex;flex-direction:column;gap:0.3em;}
+  .wx-dp-hour-row{display:flex;align-items:center;gap:0.7em;padding:0.3em 0;border-bottom:0.5px solid var(--border-divider);}
+  .wx-dp-hour-time{font-size:0.78em;color:var(--text-muted);min-width:2.5em;}
+  .wx-dp-hour-ic{font-size:1em;}
+  .wx-dp-hour-temp{font-size:0.86em;font-weight:var(--font-weight-heading);color:var(--text-primary);flex:1;}
+  .wx-dp-hour-pop{font-size:0.76em;color:var(--ev-purple-tx);}
+
+  /* ── Agent panel ── */
+  #agent-panel{display:none;position:absolute;top:10%;right:1em;width:19em;background:var(--bg-agent);backdrop-filter:blur(30px);border:0.5px solid var(--border-agent);border-radius:var(--card-radius);padding:1em;z-index:10;box-shadow:var(--card-shadow);}
+  #agent-panel.show{display:block;}
+  .agent-item{background:var(--bg-agent-item);border:0.5px solid var(--border-agent-item);border-radius:var(--item-radius);padding:0.5em 0.7em;margin-bottom:0.4em;}
+  .agent-from{font-size:0.7em;color:var(--fpill-teal-tx);font-weight:var(--font-weight-card-label);margin-bottom:0.15em;text-transform:uppercase;letter-spacing:0.05em;}
+  .agent-msg{font-size:0.8em;color:var(--text-primary);}
+
+  /* ── Settings panel ── */
+  #settings-panel{display:none;position:absolute;top:10%;right:1em;width:16em;background:var(--bg-settings);backdrop-filter:blur(30px);border:0.5px solid var(--border-settings);border-radius:var(--card-radius);padding:1.1em;z-index:10;box-shadow:var(--card-shadow);}
+  #settings-panel.show{display:block;}
+  .settings-title{font-size:0.72em;font-weight:var(--font-weight-card-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.8em;}
+  .settings-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8em;}
+  .settings-label{font-size:0.88em;color:var(--text-primary);font-weight:var(--font-weight-body);}
+  .theme-toggle{display:flex;gap:0.4em;}
+  .theme-btn{padding:0.28em 0.75em;border-radius:var(--btn-radius);font-size:0.8em;border:0.5px solid var(--border-item);color:var(--text-secondary);cursor:pointer;transition:all 0.15s;font-weight:var(--font-weight-body);}
+  .theme-btn.active{background:var(--theme-btn-active-bg);border-color:var(--theme-btn-active-bd);color:var(--theme-btn-active-tx);}
+</style>
+
+</head>
+<body>
+
+<div class="aspect-wrap">
+<div class="screen">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="time">7:42</span>
+      <span class="date">Friday, March 20</span>
+    </div>
+    <div class="topbar-center">
+      <div class="nav-pill active" id="nav-home" onclick="setPage('home')">Home</div>
+      <div class="nav-pill" id="nav-calendar" onclick="setPage('calendar')">Calendar</div>
+      <div class="nav-pill" id="nav-tasks" onclick="setPage('tasks')">Tasks</div>
+      <div class="nav-pill" id="nav-groceries" onclick="setPage('groceries')">Groceries</div>
+      <div class="nav-pill" id="nav-chores" onclick="setPage('chores')">Chores</div>
+      <div class="nav-pill" id="nav-home-control" onclick="setPage('home-control')">Home Control</div>
+      <div class="nav-pill" id="nav-weather" onclick="setPage('weather')">Weather</div>
+    </div>
+    <div class="topbar-right">
+      <div class="weather-inline" onclick="setPage('weather')">
+        <span style="font-size:1.4em;">☀️</span>
+        <div><div class="weather-temp">58°F</div><div class="weather-sub">Westminster</div></div>
+      </div>
+      <div class="notif-btn" onclick="document.getElementById('agent-panel').classList.toggle('show');document.getElementById('settings-panel').classList.remove('show')">
+        <svg width="55%" height="55%" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1.5C5.79 1.5 4 3.29 4 5.5v2.5L2.5 10h11L12 8V5.5C12 3.29 10.21 1.5 8 1.5Z" stroke="#888780" stroke-width="1.2" stroke-linejoin="round"/>
+          <path d="M6.5 11.5a1.5 1.5 0 0 0 3 0" stroke="#888780" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <div class="notif-badge">2</div>
+      </div>
+      <div class="settings-btn" onclick="document.getElementById('settings-panel').classList.toggle('show');document.getElementById('agent-panel').classList.remove('show')" title="Settings">⚙️</div>
+    </div>
+  </div>
+
+  <!-- ══ HOME PAGE ══ -->
+  <div class="page active" id="page-home">
+    <div class="main-col">
+      <div class="card cal-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6em;flex-shrink:0;">
+          <div class="card-label" style="margin-bottom:0;">Calendar — March 2026</div>
+          <div style="display:flex;gap:0.3em;">
+            <div class="tog" id="tog-month" onclick="setCalView('month')">Month</div>
+            <div class="tog on" id="tog-week" onclick="setCalView('week')">Week</div>
+            <div class="tog" id="tog-next5" onclick="setCalView('next5')">Next 5 days</div>
+            <div class="tog" id="tog-agenda" onclick="setCalView('agenda')">Agenda</div>
+          </div>
+        </div>
+        <!-- Month -->
+        <div id="cal-month" class="card-fill" style="display:none;">
+          <div class="cal-grid">
+            <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+            <div class="cal-cell other"><div class="cal-num other-num">23</div></div><div class="cal-cell other"><div class="cal-num other-num">24</div></div><div class="cal-cell other"><div class="cal-num other-num">25</div></div><div class="cal-cell other"><div class="cal-num other-num">26</div></div><div class="cal-cell other"><div class="cal-num other-num">27</div></div><div class="cal-cell other"><div class="cal-num other-num">28</div></div><div class="cal-cell"><div class="cal-num">1</div></div>
+            <div class="cal-cell"><div class="cal-num">2</div></div><div class="cal-cell"><div class="cal-num">3</div><div class="cal-ev ev-teal">8a School</div></div><div class="cal-cell"><div class="cal-num">4</div></div><div class="cal-cell"><div class="cal-num">5</div></div><div class="cal-cell"><div class="cal-num">6</div><div class="cal-ev ev-coral">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">7</div></div><div class="cal-cell"><div class="cal-num">8</div></div>
+            <div class="cal-cell"><div class="cal-num">9</div></div><div class="cal-cell"><div class="cal-num">10</div><div class="cal-ev ev-teal">3p Appt</div></div><div class="cal-cell"><div class="cal-num">11</div></div><div class="cal-cell"><div class="cal-num">12</div></div><div class="cal-cell"><div class="cal-num">13</div><div class="cal-ev ev-coral">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">14</div></div><div class="cal-cell"><div class="cal-num">15</div><div class="cal-ev ev-purple">Spring break</div></div>
+            <div class="cal-cell"><div class="cal-num">16</div><div class="cal-ev ev-purple">Spring break</div></div><div class="cal-cell"><div class="cal-num">17</div><div class="cal-ev ev-purple">Spring break</div></div><div class="cal-cell"><div class="cal-num">18</div><div class="cal-ev ev-purple">Spring break</div></div><div class="cal-cell"><div class="cal-num">19</div><div class="cal-ev ev-purple">Spring break</div></div><div class="cal-cell today"><div class="cal-num today-num">20</div><div class="cal-ev ev-coral">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">21</div><div class="cal-ev ev-teal">10a Soccer</div><div class="cal-ev ev-teal">2p Dentist</div></div><div class="cal-cell"><div class="cal-num">22</div><div class="cal-ev ev-purple">Easter</div></div>
+            <div class="cal-cell"><div class="cal-num">23</div></div><div class="cal-cell"><div class="cal-num">24</div><div class="cal-ev ev-teal">4p Pick-up</div></div><div class="cal-cell"><div class="cal-num">25</div></div><div class="cal-cell"><div class="cal-num">26</div></div><div class="cal-cell"><div class="cal-num">27</div><div class="cal-ev ev-coral">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">28</div></div><div class="cal-cell"><div class="cal-num">29</div></div>
+            <div class="cal-cell"><div class="cal-num">30</div><div class="cal-ev ev-teal">9a Yoga</div></div><div class="cal-cell"><div class="cal-num">31</div></div>
+          </div>
+        </div>
+        <!-- Week -->
+        <div id="cal-week" class="card-fill" style="display:flex;flex-direction:column;">
+          <div class="week-grid days7" style="height:100%;">
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sun</span><span class="week-date">16</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">55°</span><span class="wx-sep">/</span><span class="wx-lo">38°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 16','All day','Bryce &amp; Emery','purple','Jefferson County Schools','No school')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Mon</span><span class="week-date">17</span></div><div class="week-wx"><span class="wx-ic">🌧️</span><span class="wx-hi">50°</span><span class="wx-sep">/</span><span class="wx-lo">36°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 17','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-teal" onclick="navToEvent('Kids pickup','Mar 17','3:30p – 4:00p','Trey','teal','Prospect Ridge Academy','')"><span class="ev-time">3:30p</span><span class="ev-title">Kids pickup</span><span class="ev-who">Trey</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Tue</span><span class="week-date">18</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">53°</span><span class="wx-sep">/</span><span class="wx-lo">37°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 18','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Wed</span><span class="week-date">19</span></div><div class="week-wx"><span class="wx-ic">🌤️</span><span class="wx-hi">56°</span><span class="wx-sep">/</span><span class="wx-lo">40°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 19','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-teal" onclick="navToEvent('Dentist — Emery','Mar 19','10:00a – 11:00a','Emery','teal','Aspen Dental Westminster','Beryl driving')"><span class="ev-time">10:00a</span><span class="ev-title">Dentist — Emery</span><span class="ev-who">Beryl</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header is-today"><div class="week-header-top"><span class="week-dow">Thu</span><span class="week-date">20</span></div><div class="week-wx"><span class="wx-ic">☀️</span><span class="wx-hi">58°</span><span class="wx-sep">/</span><span class="wx-lo">42°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 20','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-coral" onclick="navToEvent('Bowling league','Mar 20','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')"><span class="ev-time">6:00p</span><span class="ev-title">Bowling league</span><span class="ev-who">Trey</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Fri</span><span class="week-date">21</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">62°</span><span class="wx-sep">/</span><span class="wx-lo">45°</span></div></div><div class="week-events"><div class="week-ev ev-teal" onclick="navToEvent('Soccer — Bryce','Mar 21','10:00a – 11:30a','Bryce','teal','Prospect Park Fields','Spring season game')"><span class="ev-time">10:00a</span><span class="ev-title">Soccer — Bryce</span><span class="ev-who">Kids</span></div><div class="week-ev ev-teal" onclick="navToEvent('Dentist — Emery','Mar 21','2:00p – 3:00p','Emery','teal','Aspen Dental Westminster','Beryl driving')"><span class="ev-time">2:00p</span><span class="ev-title">Dentist — Emery</span><span class="ev-who">Beryl</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sat</span><span class="week-date">22</span></div><div class="week-wx"><span class="wx-ic">🌧️</span><span class="wx-hi">54°</span><span class="wx-sep">/</span><span class="wx-lo">40°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Easter','Mar 22','All day','Family','purple','Home','')"><span class="ev-time">All day</span><span class="ev-title">Easter</span><span class="ev-who">Family</span></div></div></div>
+          </div>
+        </div>
+        <!-- Next 5 -->
+        <div id="cal-next5" class="card-fill" style="display:none;flex-direction:column;">
+          <div class="week-grid days5" style="height:100%;">
+            <div class="week-day-col"><div class="week-day-header is-today"><div class="week-header-top"><span class="week-dow">Thu — Today</span><span class="week-date">20</span></div><div class="week-wx"><span class="wx-ic">☀️</span><span class="wx-hi">58°</span><span class="wx-sep">/</span><span class="wx-lo">42°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Spring break','Mar 20','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-coral" onclick="navToEvent('Bowling league','Mar 20','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')"><span class="ev-time">6:00p</span><span class="ev-title">Bowling league</span><span class="ev-who">Trey</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Fri</span><span class="week-date">21</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">62°</span><span class="wx-sep">/</span><span class="wx-lo">45°</span></div></div><div class="week-events"><div class="week-ev ev-teal" onclick="navToEvent('Soccer — Bryce','Mar 21','10:00a – 11:30a','Bryce','teal','Prospect Park Fields','Spring season game')"><span class="ev-time">10:00a</span><span class="ev-title">Soccer — Bryce</span><span class="ev-who">Kids</span></div><div class="week-ev ev-teal" onclick="navToEvent('Dentist — Emery','Mar 21','2:00p – 3:00p','Emery','teal','Aspen Dental Westminster','Beryl driving')"><span class="ev-time">2:00p</span><span class="ev-title">Dentist — Emery</span><span class="ev-who">Beryl</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sat</span><span class="week-date">22</span></div><div class="week-wx"><span class="wx-ic">🌧️</span><span class="wx-hi">54°</span><span class="wx-sep">/</span><span class="wx-lo">40°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="navToEvent('Easter','Mar 22','All day','Family','purple','Home','')"><span class="ev-time">All day</span><span class="ev-title">Easter</span><span class="ev-who">Family</span></div></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sun</span><span class="week-date">23</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">59°</span><span class="wx-sep">/</span><span class="wx-lo">43°</span></div></div><div class="week-events"></div></div>
+            <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Mon</span><span class="week-date">24</span></div><div class="week-wx"><span class="wx-ic">☀️</span><span class="wx-hi">65°</span><span class="wx-sep">/</span><span class="wx-lo">48°</span></div></div><div class="week-events"><div class="week-ev ev-teal" onclick="navToEvent('School pick-up','Mar 24','4:00p – 4:30p','Trey','teal','Prospect Ridge Academy','')"><span class="ev-time">4:00p</span><span class="ev-title">School pick-up</span><span class="ev-who">Trey</span></div></div></div>
+          </div>
+        </div>
+        <!-- Agenda -->
+        <div id="cal-agenda" class="card-fill" style="display:none;">
+          <div class="agenda">
+            <div class="ag-day">Today — Thu Mar 20</div>
+            <div class="ag-row"><div class="ag-time">6:00p</div><div class="ag-dot" style="background:#D85A30"></div><div><div class="ag-text">Bowling league</div><div class="ag-who">Trey · Bowlero Wheat Ridge</div></div></div>
+            <div class="ag-day">Tomorrow — Fri Mar 21</div>
+            <div class="ag-row"><div class="ag-time">10:00a</div><div class="ag-dot" style="background:var(--person-trey)"></div><div><div class="ag-text">Soccer — Bryce</div><div class="ag-who">Kids</div></div></div>
+            <div class="ag-row"><div class="ag-time">2:00p</div><div class="ag-dot" style="background:var(--person-trey)"></div><div><div class="ag-text">Dentist — Emery</div><div class="ag-who">Beryl driving</div></div></div>
+            <div class="ag-day">Sat Mar 22</div>
+            <div class="ag-row"><div class="ag-time">All day</div><div class="ag-dot" style="background:var(--person-beryl)"></div><div><div class="ag-text">Easter</div><div class="ag-who">Family</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Sidebar -->
+    <div class="side-col">
+      <div class="card">
+        <div class="card-label">Family</div>
+        <div class="person-card">
+          <div class="person-header"><div class="person-dot" style="background:var(--person-trey)"></div><div class="person-name">Trey</div><div class="person-next">Bowling · 6pm</div></div>
+          <div class="person-todo tappable" onclick="setPage('tasks')"><div class="mini-check"></div>Pick up dry cleaning</div>
+          <div class="person-todo tappable" onclick="setPage('tasks')"><div class="mini-check"></div>Research swing set install</div>
+        </div>
+        <div class="person-card">
+          <div class="person-header"><div class="person-dot" style="background:var(--person-beryl)"></div><div class="person-name">Beryl</div><div class="person-next">Dentist run · Fri</div></div>
+          <div class="person-todo tappable" onclick="setPage('tasks')"><div class="mini-check"></div>Schedule HVAC service</div>
+        </div>
+        <div class="person-card">
+          <div class="person-header"><div class="person-dot" style="background:var(--person-bryce)"></div><div class="person-name">Bryce</div><div class="person-next">Soccer · Fri 10a</div></div>
+        </div>
+        <div class="person-card">
+          <div class="person-header"><div class="person-dot" style="background:var(--person-emery)"></div><div class="person-name">Emery</div><div class="person-next">Dentist · Fri 2p</div></div>
+        </div>
+      </div>
+      <div class="card" style="flex:1;">
+        <div class="card-label">Groceries</div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box done"></div><span class="g-text done">Eggs</span></div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box done"></div><span class="g-text done">Bread</span></div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box"></div><span class="g-text">Milk</span></div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box"></div><span class="g-text">Apples</span></div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box"></div><span class="g-text">Chicken thighs</span></div>
+        <div class="g-item tappable" onclick="setPage('groceries')"><div class="check-box"></div><span class="g-text">Sparkling water</span></div>
+        <div class="add-row"><input class="add-input" placeholder="Add item..." onclick="this.focus()"/><button class="add-btn">Add</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HOME CONTROL PAGE ══ -->
+  <div class="page" id="page-home-control">
+    <!-- Quick scenes bar -->
+    <div class="hc-quickbar">
+      <div class="hc-quick active" id="scene-normal" onclick="setScene('normal')"><span class="hc-quick-icon">🏠</span><span class="hc-quick-label">Normal</span></div>
+      <div class="hc-quick" id="scene-evening" onclick="setScene('evening')"><span class="hc-quick-icon">🌙</span><span class="hc-quick-label">Evening</span></div>
+      <div class="hc-quick" id="scene-movie" onclick="setScene('movie')"><span class="hc-quick-icon">🎬</span><span class="hc-quick-label">Movie mode</span></div>
+      <div class="hc-quick" id="scene-away" onclick="setScene('away')"><span class="hc-quick-icon">🚗</span><span class="hc-quick-label">Away</span></div>
+      <div class="hc-quick" id="scene-sleep" onclick="setScene('sleep')"><span class="hc-quick-icon">😴</span><span class="hc-quick-label">Sleep</span></div>
+      <div class="hc-quick" id="scene-alloff" onclick="setScene('alloff')"><span class="hc-quick-icon">⭕</span><span class="hc-quick-label">All lights off</span></div>
+    </div>
+    <!-- Room grid -->
+    <div class="hc-rooms">
+
+      <!-- Living Room -->
+      <div class="hc-room">
+        <div class="hc-room-name">Living room</div>
+        <div class="hc-devices">
+          <div class="hc-device on" id="dev-lr-main" onclick="toggleDevice('lr-main')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Main lights</span><div class="hc-toggle on" id="tog-lr-main"></div>
+          </div>
+          <div class="hc-dim-wrap show" id="dim-lr-main"><div class="hc-dim-label"><span>Brightness</span><span id="dim-lr-main-val">75%</span></div><input type="range" class="hc-dim-slider" min="0" max="100" value="75" oninput="document.getElementById('dim-lr-main-val').textContent=this.value+'%'"></div>
+          <div class="hc-device" id="dev-lr-lamp" onclick="toggleDevice('lr-lamp')">
+            <span class="hc-device-icon">🪔</span><span class="hc-device-name">Floor lamp</span><div class="hc-toggle" id="tog-lr-lamp"></div>
+          </div>
+          <div class="hc-therm">
+            <span class="hc-therm-icon">🌡️</span>
+            <div class="hc-therm-info"><div class="hc-therm-name">Thermostat</div><div class="hc-therm-val">Currently 68° · Set to <span id="therm-set">70°</span></div></div>
+            <div class="hc-therm-btns">
+              <div class="hc-therm-btn" onclick="adjustTherm(-1)">−</div>
+              <div class="hc-therm-btn" onclick="adjustTherm(1)">+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kitchen -->
+      <div class="hc-room">
+        <div class="hc-room-name">Kitchen</div>
+        <div class="hc-devices">
+          <div class="hc-device on" id="dev-kit-main" onclick="toggleDevice('kit-main')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Overhead lights</span><div class="hc-toggle on" id="tog-kit-main"></div>
+          </div>
+          <div class="hc-dim-wrap show" id="dim-kit-main"><div class="hc-dim-label"><span>Brightness</span><span id="dim-kit-main-val">100%</span></div><input type="range" class="hc-dim-slider" min="0" max="100" value="100" oninput="document.getElementById('dim-kit-main-val').textContent=this.value+'%'"></div>
+          <div class="hc-device" id="dev-kit-under" onclick="toggleDevice('kit-under')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Under-cabinet</span><div class="hc-toggle" id="tog-kit-under"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bedrooms -->
+      <div class="hc-room">
+        <div class="hc-room-name">Bedrooms</div>
+        <div class="hc-devices">
+          <div class="hc-device" id="dev-bed-master" onclick="toggleDevice('bed-master')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Primary bedroom</span><div class="hc-toggle" id="tog-bed-master"></div>
+          </div>
+          <div class="hc-device" id="dev-bed-bryce" onclick="toggleDevice('bed-bryce')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Bryce's room</span><div class="hc-toggle" id="tog-bed-bryce"></div>
+          </div>
+          <div class="hc-device" id="dev-bed-emery" onclick="toggleDevice('bed-emery')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Emery's room</span><div class="hc-toggle" id="tog-bed-emery"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Garage & Exterior -->
+      <div class="hc-room">
+        <div class="hc-room-name">Garage &amp; exterior</div>
+        <div class="hc-devices">
+          <div class="hc-garage open" id="garage-door" onclick="toggleGarage()">
+            <span class="hc-garage-icon">🚗</span>
+            <div class="hc-garage-info">
+              <div class="hc-garage-name">Garage door</div>
+              <div class="hc-garage-status" id="garage-status">Open</div>
+            </div>
+            <div class="hc-garage-btn" id="garage-btn">Close</div>
+          </div>
+          <div class="hc-device on" id="dev-ext-front" onclick="toggleDevice('ext-front')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Front porch</span><div class="hc-toggle on" id="tog-ext-front"></div>
+          </div>
+          <div class="hc-device" id="dev-ext-back" onclick="toggleDevice('ext-back')">
+            <span class="hc-device-icon">💡</span><span class="hc-device-name">Backyard lights</span><div class="hc-toggle" id="tog-ext-back"></div>
+          </div>
+          <div class="hc-cam">
+            <span class="hc-cam-icon">📹</span><span class="hc-cam-name">Front doorbell</span><span class="hc-cam-badge">Live</span>
+          </div>
+          <div class="hc-cam">
+            <span class="hc-cam-icon">📹</span><span class="hc-cam-name">Backyard camera</span><span class="hc-cam-badge">Live</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ WEATHER PAGE ══ -->
+  <div class="page" id="page-weather">
+    <div class="wx-hero"><div class="wx-hero-icon">☀️</div><div class="wx-hero-temp">58°</div><div class="wx-hero-info"><div class="wx-hero-desc">Sunny</div><div class="wx-hero-loc">Westminster, CO</div><div class="wx-hero-feels">Feels like 55° · High 58° · Low 42°</div></div></div>
+    <div class="wx-stats"><div class="wx-stat"><div class="wx-stat-label">Humidity</div><div class="wx-stat-val">28%</div></div><div class="wx-stat"><div class="wx-stat-label">Wind</div><div class="wx-stat-val">9 mph W</div></div><div class="wx-stat"><div class="wx-stat-label">UV index</div><div class="wx-stat-val">4 Moderate</div></div><div class="wx-stat"><div class="wx-stat-label">Visibility</div><div class="wx-stat-val">10 mi</div></div><div class="wx-stat"><div class="wx-stat-label">Sunrise</div><div class="wx-stat-val">6:42a</div></div><div class="wx-stat"><div class="wx-stat-label">Sunset</div><div class="wx-stat-val">7:28p</div></div></div>
+    <div><div class="wx-section-label">Hourly</div><div class="wx-hourly"><div class="wx-hour"><div class="wx-hour-time">Now</div><div class="wx-hour-ic">☀️</div><div class="wx-hour-temp">58°</div><div class="wx-hour-pop"></div></div><div class="wx-hour"><div class="wx-hour-time">9a</div><div class="wx-hour-ic">☀️</div><div class="wx-hour-temp">56°</div><div class="wx-hour-pop"></div></div><div class="wx-hour"><div class="wx-hour-time">10a</div><div class="wx-hour-ic">🌤️</div><div class="wx-hour-temp">57°</div><div class="wx-hour-pop"></div></div><div class="wx-hour"><div class="wx-hour-time">11a</div><div class="wx-hour-ic">🌤️</div><div class="wx-hour-temp">57°</div><div class="wx-hour-pop"></div></div><div class="wx-hour"><div class="wx-hour-time">12p</div><div class="wx-hour-ic">⛅</div><div class="wx-hour-temp">57°</div><div class="wx-hour-pop">10%</div></div><div class="wx-hour"><div class="wx-hour-time">1p</div><div class="wx-hour-ic">⛅</div><div class="wx-hour-temp">57°</div><div class="wx-hour-pop">10%</div></div><div class="wx-hour"><div class="wx-hour-time">2p</div><div class="wx-hour-ic">⛅</div><div class="wx-hour-temp">56°</div><div class="wx-hour-pop">15%</div></div><div class="wx-hour"><div class="wx-hour-time">3p</div><div class="wx-hour-ic">🌥️</div><div class="wx-hour-temp">55°</div><div class="wx-hour-pop">20%</div></div><div class="wx-hour"><div class="wx-hour-time">4p</div><div class="wx-hour-ic">🌥️</div><div class="wx-hour-temp">54°</div><div class="wx-hour-pop">20%</div></div><div class="wx-hour"><div class="wx-hour-time">5p</div><div class="wx-hour-ic">🌥️</div><div class="wx-hour-temp">52°</div><div class="wx-hour-pop">20%</div></div><div class="wx-hour"><div class="wx-hour-time">6p</div><div class="wx-hour-ic">🌧️</div><div class="wx-hour-temp">50°</div><div class="wx-hour-pop">60%</div></div><div class="wx-hour"><div class="wx-hour-time">7p</div><div class="wx-hour-ic">🌧️</div><div class="wx-hour-temp">48°</div><div class="wx-hour-pop">65%</div></div></div></div>
+    <div class="wx-daily" style="flex:1;">
+      <div class="wx-section-label">7-day forecast <span style="font-size:0.85em;color:#5f5e5a;font-weight:400;text-transform:none;letter-spacing:0;">· tap a day for details</span></div>
+      <div class="wx-day-row" onclick="openWxDay('Thursday Mar 20','☀️','Sunny','58°','42°','28%','9 mph W','4 Moderate','6:42a','7:28p',[['6a','☀️','44°',''],['8a','☀️','50°',''],['10a','☀️','56°',''],['12p','⛅','57°','10%'],['2p','⛅','56°','15%'],['4p','🌥️','54°','20%'],['6p','🌧️','50°','60%'],['8p','🌧️','47°','65%']])"><div class="wx-day-name">Today</div><div class="wx-day-ic">☀️</div><div class="wx-day-desc">Sunny</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:70%;margin-left:20%"></div></div><div class="wx-day-lo">42°</div><div class="wx-day-hi">58°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Friday Mar 21','⛅','Partly cloudy','62°','45°','32%','12 mph SW','3 Moderate','6:40a','7:29p',[['6a','⛅','46°',''],['8a','⛅','52°',''],['10a','🌤️','58°','5%'],['12p','⛅','61°','10%'],['2p','⛅','62°','15%'],['4p','🌥️','60°','20%'],['6p','🌥️','56°','25%'],['8p','⛅','50°','15%']])"><div class="wx-day-name">Fri</div><div class="wx-day-ic">⛅</div><div class="wx-day-desc">Partly cloudy</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:75%;margin-left:22%"></div></div><div class="wx-day-lo">45°</div><div class="wx-day-hi">62°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Saturday Mar 22','🌧️','Rain showers','54°','40°','65%','8 mph E','1 Low','6:39a','7:30p',[['6a','🌥️','41°','20%'],['8a','🌧️','44°','55%'],['10a','🌧️','48°','70%'],['12p','🌧️','51°','75%'],['2p','🌧️','53°','70%'],['4p','🌦️','52°','50%'],['6p','⛅','49°','30%'],['8p','⛅','44°','20%']])"><div class="wx-day-name">Sat</div><div class="wx-day-ic">🌧️</div><div class="wx-day-desc">Rain showers</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:65%;margin-left:18%"></div></div><div class="wx-day-lo">40°</div><div class="wx-day-hi">54°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Sunday Mar 23','⛅','Partly cloudy','59°','43°','40%','7 mph W','2 Low','6:38a','7:31p',[['6a','⛅','44°',''],['8a','🌤️','48°',''],['10a','🌤️','54°','10%'],['12p','⛅','58°','15%'],['2p','⛅','59°','15%'],['4p','⛅','57°','10%'],['6p','🌤️','53°',''],['8p','🌤️','47°','']])"><div class="wx-day-name">Sun</div><div class="wx-day-ic">⛅</div><div class="wx-day-desc">Partly cloudy</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:72%;margin-left:20%"></div></div><div class="wx-day-lo">43°</div><div class="wx-day-hi">59°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Monday Mar 24','☀️','Sunny','65°','48°','22%','10 mph SW','5 Moderate','6:36a','7:32p',[['6a','☀️','49°',''],['8a','☀️','54°',''],['10a','☀️','60°',''],['12p','☀️','64°',''],['2p','☀️','65°',''],['4p','🌤️','63°',''],['6p','🌤️','58°',''],['8p','⛅','52°','']])"><div class="wx-day-name">Mon</div><div class="wx-day-ic">☀️</div><div class="wx-day-desc">Sunny</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:80%;margin-left:22%"></div></div><div class="wx-day-lo">48°</div><div class="wx-day-hi">65°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Tuesday Mar 25','🌤️','Mostly sunny','67°','50°','25%','11 mph W','5 Moderate','6:35a','7:33p',[['6a','🌤️','51°',''],['8a','☀️','56°',''],['10a','☀️','62°',''],['12p','☀️','66°',''],['2p','🌤️','67°','5%'],['4p','🌤️','65°','5%'],['6p','⛅','60°','10%'],['8p','⛅','54°','10%']])"><div class="wx-day-name">Tue</div><div class="wx-day-ic">🌤️</div><div class="wx-day-desc">Mostly sunny</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:78%;margin-left:25%"></div></div><div class="wx-day-lo">50°</div><div class="wx-day-hi">67°</div></div>
+      <div class="wx-day-row" onclick="openWxDay('Wednesday Mar 26','⛅','Partly cloudy','63°','46°','38%','9 mph W','3 Moderate','6:33a','7:34p',[['6a','⛅','47°',''],['8a','🌤️','52°',''],['10a','⛅','57°','10%'],['12p','⛅','62°','15%'],['2p','⛅','63°','20%'],['4p','🌥️','61°','25%'],['6p','🌥️','56°','30%'],['8p','🌧️','50°','40%']])"><div class="wx-day-name">Wed</div><div class="wx-day-ic">⛅</div><div class="wx-day-desc">Partly cloudy</div><div class="wx-bar-wrap"><div class="wx-bar" style="width:74%;margin-left:22%"></div></div><div class="wx-day-lo">46°</div><div class="wx-day-hi">63°</div></div>
+    </div>
+  </div>
+
+  <!-- ══ CALENDAR FULL PAGE ══ -->
+  <div class="page" id="page-calendar" style="flex-direction:column;padding:1em;gap:0.8em;">
+    <div class="card" style="flex:1;min-height:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5em;flex-shrink:0;">
+        <div class="card-label" style="margin-bottom:0;">Calendar — March / April 2026</div>
+        <div style="display:flex;gap:0.3em;">
+          <div class="tog" id="fc-tog-month" onclick="setFCView('month')">Month</div>
+          <div class="tog on" id="fc-tog-week" onclick="setFCView('week')">Week</div>
+          <div class="tog" id="fc-tog-agenda" onclick="setFCView('agenda')">Agenda</div>
+        </div>
+      </div>
+      <!-- Person filters -->
+      <div style="display:flex;gap:0.35em;margin-bottom:0.6em;flex-shrink:0;">
+        <div class="cpill on" onclick="toggleCPill(this)">All</div>
+        <div class="cpill ctrey on" onclick="toggleCPill(this)">Trey</div>
+        <div class="cpill cberyl on" onclick="toggleCPill(this)">Beryl</div>
+        <div class="cpill ckids on" onclick="toggleCPill(this)">Bryce &amp; Emery</div>
+        <div class="cpill cfamily on" onclick="toggleCPill(this)">Family</div>
+      </div>
+      <!-- Full calendar month -->
+      <div id="fc-month" class="card-fill" style="display:none;">
+        <div class="cal-grid">
+          <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+          <div class="cal-cell other"><div class="cal-num other-num">23</div></div><div class="cal-cell other"><div class="cal-num other-num">24</div></div><div class="cal-cell other"><div class="cal-num other-num">25</div></div><div class="cal-cell other"><div class="cal-num other-num">26</div></div><div class="cal-cell other"><div class="cal-num other-num">27</div></div><div class="cal-cell other"><div class="cal-num other-num">28</div></div><div class="cal-cell"><div class="cal-num">1</div></div>
+          <div class="cal-cell"><div class="cal-num">2</div></div><div class="cal-cell"><div class="cal-num">3</div><div class="cal-ev ev-teal" onclick="openEvent('School run','Mar 3','8:00a – 9:00a','Trey','teal','Prospect Ridge Academy','Drop off kids before work')">8a School run</div></div><div class="cal-cell"><div class="cal-num">4</div></div><div class="cal-cell"><div class="cal-num">5</div></div><div class="cal-cell"><div class="cal-num">6</div><div class="cal-ev ev-coral" onclick="openEvent('Bowling league','Mar 6','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','Weekly Thursday night bowling league')">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">7</div></div><div class="cal-cell"><div class="cal-num">8</div></div>
+          <div class="cal-cell"><div class="cal-num">9</div></div><div class="cal-cell"><div class="cal-num">10</div><div class="cal-ev ev-teal" onclick="openEvent('Appointment','Mar 10','3:00p – 4:00p','Trey','teal','Westminster Medical Center','Annual checkup')">3p Appt</div></div><div class="cal-cell"><div class="cal-num">11</div></div><div class="cal-cell"><div class="cal-num">12</div></div><div class="cal-cell"><div class="cal-num">13</div><div class="cal-ev ev-coral" onclick="openEvent('Bowling league','Mar 13','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','Weekly bowling league')">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">14</div></div><div class="cal-cell"><div class="cal-num">15</div><div class="cal-ev ev-purple" onclick="openEvent('Spring break','Mar 15–22','All day','Bryce &amp; Emery','purple','Jefferson County Schools','No school')">Spring break</div></div>
+          <div class="cal-cell"><div class="cal-num">16</div><div class="cal-ev ev-purple" onclick="openEvent('Spring break','Mar 16','All day','Bryce &amp; Emery','purple','Jefferson County Schools','No school')">Spring break</div></div><div class="cal-cell"><div class="cal-num">17</div><div class="cal-ev ev-purple" onclick="openEvent('Spring break','Mar 17','All day','Bryce &amp; Emery','purple','','')">Spring break</div></div><div class="cal-cell"><div class="cal-num">18</div><div class="cal-ev ev-purple" onclick="openEvent('Spring break','Mar 18','All day','Bryce &amp; Emery','purple','','')">Spring break</div></div><div class="cal-cell"><div class="cal-num">19</div><div class="cal-ev ev-purple" onclick="openEvent('Spring break','Mar 19','All day','Bryce &amp; Emery','purple','','')">Spring break</div></div><div class="cal-cell today"><div class="cal-num today-num">20</div><div class="cal-ev ev-coral" onclick="openEvent('Bowling league','Mar 20','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">21</div><div class="cal-ev ev-teal" onclick="openEvent('Soccer — Bryce','Mar 21','10:00a – 11:30a','Bryce','teal','Prospect Park Fields','Spring season game')">10a Soccer</div><div class="cal-ev ev-teal" onclick="openEvent('Dentist — Emery','Mar 21','2:00p – 3:00p','Emery','teal','Aspen Dental Westminster','Routine cleaning. Beryl driving.')">2p Dentist</div></div><div class="cal-cell"><div class="cal-num">22</div><div class="cal-ev ev-purple" onclick="openEvent('Easter','Mar 22','All day','Family','purple','Home','')">Easter</div></div>
+          <div class="cal-cell"><div class="cal-num">23</div></div><div class="cal-cell"><div class="cal-num">24</div><div class="cal-ev ev-teal" onclick="openEvent('School pick-up','Mar 24','4:00p – 4:30p','Trey','teal','Prospect Ridge Academy','')">4p Pick-up</div></div><div class="cal-cell"><div class="cal-num">25</div></div><div class="cal-cell"><div class="cal-num">26</div></div><div class="cal-cell"><div class="cal-num">27</div><div class="cal-ev ev-coral" onclick="openEvent('Bowling league','Mar 27','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')">6p Bowling</div></div><div class="cal-cell"><div class="cal-num">28</div></div><div class="cal-cell"><div class="cal-num">29</div></div>
+          <div class="cal-cell"><div class="cal-num">30</div><div class="cal-ev ev-teal" onclick="openEvent('Yoga','Mar 30','9:00a – 10:00a','Trey','teal','Lifetime Fitness Westminster','')">9a Yoga</div></div><div class="cal-cell"><div class="cal-num">31</div></div><div class="cal-cell" style="opacity:0.4"><div class="cal-num other-num">1</div></div><div class="cal-cell" style="opacity:0.4"><div class="cal-num other-num">2</div></div><div class="cal-cell" style="opacity:0.4"><div class="cal-num other-num">3</div></div><div class="cal-cell" style="opacity:0.4"><div class="cal-num other-num">4</div></div><div class="cal-cell" style="opacity:0.4"><div class="cal-num other-num">5</div></div>
+        </div>
+      </div>
+      <!-- Full calendar week (default) -->
+      <div id="fc-week" class="card-fill" style="display:flex;flex-direction:column;">
+        <div class="week-grid days7" style="height:100%;">
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sun</span><span class="week-date">16</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">55°</span><span class="wx-sep">/</span><span class="wx-lo">38°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Spring break','Mar 16','All day','Bryce &amp; Emery','purple','Jefferson County Schools','No school')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Mon</span><span class="week-date">17</span></div><div class="week-wx"><span class="wx-ic">🌧️</span><span class="wx-hi">50°</span><span class="wx-sep">/</span><span class="wx-lo">36°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Spring break','Mar 17','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-teal" onclick="openEvent('Kids pickup','Mar 17','3:30p – 4:00p','Trey','teal','Prospect Ridge Academy','')"><span class="ev-time">3:30p</span><span class="ev-title">Kids pickup</span><span class="ev-who">Trey</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Tue</span><span class="week-date">18</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">53°</span><span class="wx-sep">/</span><span class="wx-lo">37°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Spring break','Mar 18','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Wed</span><span class="week-date">19</span></div><div class="week-wx"><span class="wx-ic">🌤️</span><span class="wx-hi">56°</span><span class="wx-sep">/</span><span class="wx-lo">40°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Spring break','Mar 19','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-teal" onclick="openEvent('Dentist — Emery','Mar 19','10:00a – 11:00a','Emery','teal','Aspen Dental Westminster','Beryl driving')"><span class="ev-time">10:00a</span><span class="ev-title">Dentist — Emery</span><span class="ev-who">Beryl</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header is-today"><div class="week-header-top"><span class="week-dow">Thu</span><span class="week-date">20</span></div><div class="week-wx"><span class="wx-ic">☀️</span><span class="wx-hi">58°</span><span class="wx-sep">/</span><span class="wx-lo">42°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Spring break','Mar 20','All day','Bryce &amp; Emery','purple','','')"><span class="ev-time">All day</span><span class="ev-title">Spring break</span></div><div class="week-ev ev-coral" onclick="openEvent('Bowling league','Mar 20','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')"><span class="ev-time">6:00p</span><span class="ev-title">Bowling league</span><span class="ev-who">Trey</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Fri</span><span class="week-date">21</span></div><div class="week-wx"><span class="wx-ic">⛅</span><span class="wx-hi">62°</span><span class="wx-sep">/</span><span class="wx-lo">45°</span></div></div><div class="week-events"><div class="week-ev ev-teal" onclick="openEvent('Soccer — Bryce','Mar 21','10:00a – 11:30a','Bryce','teal','Prospect Park Fields','Spring season game')"><span class="ev-time">10:00a</span><span class="ev-title">Soccer — Bryce</span><span class="ev-who">Kids</span></div><div class="week-ev ev-teal" onclick="openEvent('Dentist — Emery','Mar 21','2:00p – 3:00p','Emery','teal','Aspen Dental Westminster','Beryl driving')"><span class="ev-time">2:00p</span><span class="ev-title">Dentist — Emery</span><span class="ev-who">Beryl</span></div></div></div>
+          <div class="week-day-col"><div class="week-day-header"><div class="week-header-top"><span class="week-dow">Sat</span><span class="week-date">22</span></div><div class="week-wx"><span class="wx-ic">🌧️</span><span class="wx-hi">54°</span><span class="wx-sep">/</span><span class="wx-lo">40°</span></div></div><div class="week-events"><div class="week-ev ev-purple" onclick="openEvent('Easter','Mar 22','All day','Family','purple','Home','')"><span class="ev-time">All day</span><span class="ev-title">Easter</span><span class="ev-who">Family</span></div></div></div>
+        </div>
+      </div>
+      <!-- Full calendar agenda -->
+      <div id="fc-agenda" class="card-fill" style="display:none;">
+        <div class="agenda">
+          <div class="ag-day">Today — Thu Mar 20</div>
+          <div class="ag-row" onclick="openEvent('Bowling league','Mar 20','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')" style="cursor:pointer;"><div class="ag-time">6:00p</div><div class="ag-dot" style="background:#D85A30"></div><div><div class="ag-text">Bowling league</div><div class="ag-who">Trey · Bowlero Wheat Ridge</div></div></div>
+          <div class="ag-day">Fri Mar 21</div>
+          <div class="ag-row" onclick="openEvent('Soccer — Bryce','Mar 21','10:00a – 11:30a','Bryce','teal','Prospect Park Fields','Spring season game')" style="cursor:pointer;"><div class="ag-time">10:00a</div><div class="ag-dot" style="background:var(--person-trey)"></div><div><div class="ag-text">Soccer — Bryce</div><div class="ag-who">Kids · Prospect Park</div></div></div>
+          <div class="ag-row" onclick="openEvent('Dentist — Emery','Mar 21','2:00p – 3:00p','Emery','teal','Aspen Dental Westminster','Beryl driving')" style="cursor:pointer;"><div class="ag-time">2:00p</div><div class="ag-dot" style="background:var(--person-trey)"></div><div><div class="ag-text">Dentist — Emery</div><div class="ag-who">Beryl driving</div></div></div>
+          <div class="ag-day">Sat Mar 22</div>
+          <div class="ag-row" onclick="openEvent('Easter','Mar 22','All day','Family','purple','Home','')" style="cursor:pointer;"><div class="ag-time">All day</div><div class="ag-dot" style="background:var(--person-beryl)"></div><div><div class="ag-text">Easter</div><div class="ag-who">Family</div></div></div>
+          <div class="ag-day">Mon Mar 24</div>
+          <div class="ag-row" onclick="openEvent('School pick-up','Mar 24','4:00p – 4:30p','Trey','teal','Prospect Ridge Academy','')" style="cursor:pointer;"><div class="ag-time">4:00p</div><div class="ag-dot" style="background:var(--person-trey)"></div><div><div class="ag-text">School pick-up</div><div class="ag-who">Trey</div></div></div>
+          <div class="ag-day">Thu Mar 27</div>
+          <div class="ag-row" onclick="openEvent('Bowling league','Mar 27','6:00p – 8:30p','Trey','coral','Bowlero Wheat Ridge','')" style="cursor:pointer;"><div class="ag-time">6:00p</div><div class="ag-dot" style="background:#D85A30"></div><div><div class="ag-text">Bowling league</div><div class="ag-who">Trey · Bowlero Wheat Ridge</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ══ TASKS FULL PAGE ══ -->
+  <div class="page full-page" id="page-tasks">
+    <div class="fp-sidebar">
+      <div style="margin-bottom:0.4em;">
+        <div class="fp-title">Tasks</div>
+        <div class="fp-subtitle" id="task-count">20 open · 4 due today</div>
+      </div>
+      <div class="filter-section-label">Filter by person</div>
+      <div class="filter-row" id="person-filters">
+        <div class="fpill on" data-person="all" onclick="applyTaskFilter(this,'person')">All</div>
+        <div class="fpill teal" data-person="trey" onclick="applyTaskFilter(this,'person')">Trey</div>
+        <div class="fpill purple" data-person="beryl" onclick="applyTaskFilter(this,'person')">Beryl</div>
+        <div class="fpill amber" data-person="kids" onclick="applyTaskFilter(this,'person')">Kids</div>
+        <div class="fpill coral" data-person="family" onclick="applyTaskFilter(this,'person')">Family</div>
+      </div>
+      <div class="filter-section-label">Filter by time</div>
+      <div class="filter-row" id="time-filters">
+        <div class="fpill on" data-time="all" onclick="applyTaskFilter(this,'time')">All</div>
+        <div class="fpill" data-time="today" onclick="applyTaskFilter(this,'time')">Today</div>
+        <div class="fpill" data-time="week" onclick="applyTaskFilter(this,'time')">This week</div>
+        <div class="fpill" data-time="later" onclick="applyTaskFilter(this,'time')">Later</div>
+      </div>
+      <div class="add-row" style="margin-top:auto;padding-top:0.8em;border-top:0.5px solid rgba(255,255,255,0.06);">
+        <input class="add-input" placeholder="Add a task..." onclick="this.focus()"/>
+        <button class="add-btn">Add</button>
+      </div>
+    </div>
+    <div class="fp-main" style="overflow:hidden;">
+      <div class="task-scroll" id="task-list">
+        <div class="task-section-head">Today</div>
+        <div class="task-item" data-person="trey" data-time="today" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Pick up dry cleaning</div><div class="task-meta"><span class="task-due">Due today</span><span class="task-tag tag-trey">Trey</span></div></div>
+        </div>
+        <div class="task-item" data-person="beryl" data-time="today" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Schedule HVAC service call</div><div class="task-meta"><span class="task-due">Due today</span><span class="task-tag tag-beryl">Beryl</span></div></div>
+        </div>
+        <div class="task-item" data-person="kids" data-time="today" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Empty dishwasher</div><div class="task-meta"><span class="task-due">Due today</span><span class="task-tag tag-kids">Kids</span></div></div>
+        </div>
+        <div class="task-item done" data-person="trey" data-time="today" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb checked"></div><div><div class="task-text">Take out recycling</div><div class="task-meta"><span class="task-due">Done</span><span class="task-tag tag-trey">Trey</span></div></div>
+        </div>
+        <div class="task-section-head">This week</div>
+        <div class="task-item" data-person="trey" data-time="week" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Research swing set installation</div><div class="task-meta"><span class="task-due">Sat Mar 22</span><span class="task-tag tag-trey">Trey</span></div></div>
+        </div>
+        <div class="task-item" data-person="beryl" data-time="week" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Pay water bill</div><div class="task-meta"><span class="task-due">Sun Mar 23</span><span class="task-tag tag-beryl">Beryl</span></div></div>
+        </div>
+        <div class="task-item" data-person="kids" data-time="week" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Return library books</div><div class="task-meta"><span class="task-due">Mon Mar 24</span><span class="task-tag tag-kids">Kids</span></div></div>
+        </div>
+        <div class="task-item" data-person="trey" data-time="week" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Get car oil change</div><div class="task-meta"><span class="task-due">Fri Mar 28</span><span class="task-tag tag-trey">Trey</span></div></div>
+        </div>
+        <div class="task-item" data-person="family" data-time="week" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Plan Easter dinner menu</div><div class="task-meta"><span class="task-due">Sat Mar 22</span><span class="task-tag tag-family">Family</span></div></div>
+        </div>
+        <div class="task-section-head">Coming up</div>
+        <div class="task-item" data-person="family" data-time="later" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">File taxes</div><div class="task-meta"><span class="task-due">Apr 15</span><span class="task-tag tag-family">Family</span></div></div>
+        </div>
+        <div class="task-item" data-person="kids" data-time="later" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Bryce's baseball signup</div><div class="task-meta"><span class="task-due">Apr 1</span><span class="task-tag tag-kids">Kids</span></div></div>
+        </div>
+        <div class="task-item" data-person="beryl" data-time="later" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Schedule summer camp</div><div class="task-meta"><span class="task-due">Apr 10</span><span class="task-tag tag-beryl">Beryl</span></div></div>
+        </div>
+        <div class="task-item" data-person="trey" data-time="later" onclick="this.classList.toggle('done');this.querySelector('.task-cb').classList.toggle('checked')">
+          <div class="task-cb"></div><div><div class="task-text">Fix back fence gate</div><div class="task-meta"><span class="task-due">Apr 5</span><span class="task-tag tag-trey">Trey</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GROCERIES FULL PAGE ══ -->
+  <div class="page full-page" id="page-groceries">
+    <div class="fp-sidebar">
+      <div style="margin-bottom:0.6em;">
+        <div class="fp-title">Groceries</div>
+        <div class="fp-subtitle" id="grocery-subtitle">Grocery store · 10 items</div>
+      </div>
+      <!-- Store tabs -->
+      <div style="display:flex;flex-direction:column;gap:0.3em;margin-bottom:0.8em;">
+        <div id="store-grocery" onclick="setStore('grocery')" style="padding:0.5em 0.8em;border-radius:8px;background:rgba(55,138,221,0.18);border:0.5px solid rgba(55,138,221,0.35);color:#85B7EB;font-size:0.88em;font-weight:500;cursor:pointer;">🛒 Grocery store <span style="float:right;opacity:0.7;">10</span></div>
+        <div id="store-costco" onclick="setStore('costco')" style="padding:0.5em 0.8em;border-radius:8px;background:rgba(255,255,255,0.03);border:0.5px solid rgba(255,255,255,0.08);color:#888780;font-size:0.88em;cursor:pointer;">📦 Costco <span style="float:right;opacity:0.7;">4</span></div>
+        <div id="store-other" onclick="setStore('other')" style="padding:0.5em 0.8em;border-radius:8px;background:rgba(255,255,255,0.03);border:0.5px solid rgba(255,255,255,0.08);color:#888780;font-size:0.88em;cursor:pointer;">🏪 Other <span style="float:right;opacity:0.7;">2</span></div>
+      </div>
+      <div class="freq-section">
+        <div class="freq-label">Frequently added</div>
+        <div class="freq-chips" id="freq-chips">
+          <div class="freq-chip" onclick="addFreqItem(this)">🥛 Milk</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🥚 Eggs</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🍞 Bread</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🧀 Cheese</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🍌 Bananas</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🐔 Chicken</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">💧 Sparkling water</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🍎 Apples</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🍝 Pasta</div>
+          <div class="freq-chip" onclick="addFreqItem(this)">🧴 Dish soap</div>
+        </div>
+      </div>
+      <div style="margin-top:0.8em;padding-top:0.8em;border-top:0.5px solid rgba(255,255,255,0.06);">
+        <div class="add-row" style="margin-top:0;padding-top:0;border-top:none;">
+          <input class="add-input" id="grocery-add-input" placeholder="Add item..." onclick="this.focus()"/>
+          <button class="add-btn" onclick="addGroceryItem()">Add</button>
+        </div>
+      </div>
+      <div style="margin-top:0.5em;">
+        <button class="add-btn" style="width:100%;padding:0.5em;font-size:0.85em;" onclick="clearCheckedGroceries()">Clear checked items</button>
+      </div>
+    </div>
+    <div class="fp-main" style="overflow:hidden;">
+      <!-- Grocery store list -->
+      <div id="list-grocery" class="grocery-list-full" style="overflow-y:auto;flex:1;">
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Apples</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Baby spinach</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Bananas</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Cherry tomatoes</span></div>
+        <div class="g-full-item checked" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb on"></div><span class="g-full-text">Eggs</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Milk (2%)</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Shredded cheddar</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Chicken thighs</span></div>
+        <div class="g-full-item checked" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb on"></div><span class="g-full-text">Bread</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Orange juice</span></div>
+      </div>
+      <!-- Costco list -->
+      <div id="list-costco" class="grocery-list-full" style="display:none;overflow-y:auto;flex:1;">
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Olive oil (2L)</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Sparkling water (24pk)</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Pasta (5lb bag)</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Ground beef (3lb)</span></div>
+      </div>
+      <!-- Other list -->
+      <div id="list-other" class="grocery-list-full" style="display:none;overflow-y:auto;flex:1;">
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Dish soap (Target)</span></div>
+        <div class="g-full-item" onclick="this.classList.toggle('checked');this.querySelector('.g-full-cb').classList.toggle('on')"><div class="g-full-cb"></div><span class="g-full-text">Kids multivitamins (Target)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CHORES FULL PAGE ══ -->
+  <div class="page full-page" id="page-chores">
+    <div class="fp-sidebar">
+      <div style="margin-bottom:0.4em;">
+        <div class="fp-title">Chores</div>
+        <div class="fp-subtitle">Week of Mar 20 · 9 of 18 done</div>
+      </div>
+      <div style="background:#181c24;border:0.5px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7em;margin-top:0.4em;">
+        <div style="font-size:0.72em;color:#5f5e5a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5em;">Progress this week</div>
+        <div style="display:flex;flex-direction:column;gap:0.4em;">
+          <div><div style="display:flex;justify-content:space-between;font-size:0.8em;color:#d3d1c7;margin-bottom:0.2em;"><span>Trey</span><span style="color:#5DCAA5">3/4</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="width:75%;height:100%;background:#1D9E75;border-radius:2px;"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:0.8em;color:#d3d1c7;margin-bottom:0.2em;"><span>Beryl</span><span style="color:#5DCAA5">4/5</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="width:80%;height:100%;background:#7F77DD;border-radius:2px;"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:0.8em;color:#d3d1c7;margin-bottom:0.2em;"><span>Bryce</span><span style="color:#888780">1/4</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="width:25%;height:100%;background:#F0997B;border-radius:2px;"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:0.8em;color:#d3d1c7;margin-bottom:0.2em;"><span>Emery</span><span style="color:#888780">1/5</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="width:20%;height:100%;background:#AFA9EC;border-radius:2px;"></div></div></div>
+        </div>
+      </div>
+      <div style="margin-top:auto;padding-top:0.8em;border-top:0.5px solid rgba(255,255,255,0.06);">
+        <div style="font-size:0.72em;color:#5f5e5a;margin-bottom:0.4em;">Week navigation <span style="color:#3a3a38;">· live in Phase 3</span></div>
+        <div style="display:flex;gap:0.4em;">
+          <button class="add-btn" style="flex:1;justify-content:center;opacity:0.4;cursor:default;">← Prev</button>
+          <button class="add-btn" style="flex:1;justify-content:center;opacity:0.4;cursor:default;">Next →</button>
+        </div>
+      </div>
+    </div>
+    <div class="fp-main">
+      <div class="chore-grid">
+        <!-- Trey -->
+        <div class="chore-person">
+          <div class="chore-person-head"><div class="chore-dot" style="background:var(--person-trey)"></div><div class="chore-person-name">Trey</div><div class="chore-score">3 / 4</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Take out trash</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Vacuum living room</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Mow lawn</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Clean garage</div><div class="chore-freq">Monthly</div></div>
+        </div>
+        <!-- Beryl -->
+        <div class="chore-person">
+          <div class="chore-person-head"><div class="chore-dot" style="background:var(--person-beryl)"></div><div class="chore-person-name">Beryl</div><div class="chore-score">4 / 5</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Laundry</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Grocery shopping</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Clean bathrooms</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Meal prep</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Deep clean kitchen</div><div class="chore-freq">Monthly</div></div>
+        </div>
+        <!-- Bryce -->
+        <div class="chore-person">
+          <div class="chore-person-head"><div class="chore-dot" style="background:var(--person-bryce)"></div><div class="chore-person-name">Bryce</div><div class="chore-score">1 / 4</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Make bed</div><div class="chore-freq">Daily</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Empty dishwasher</div><div class="chore-freq">Daily</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Tidy bedroom</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Feed dog</div><div class="chore-freq">Daily</div></div>
+        </div>
+        <!-- Emery -->
+        <div class="chore-person">
+          <div class="chore-person-head"><div class="chore-dot" style="background:var(--person-emery)"></div><div class="chore-person-name">Emery</div><div class="chore-score">1 / 5</div></div>
+          <div class="chore-item done" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb on"></div><div class="chore-text">Make bed</div><div class="chore-freq">Daily</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Set dinner table</div><div class="chore-freq">Daily</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Tidy bedroom</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Water plants</div><div class="chore-freq">Weekly</div></div>
+          <div class="chore-item" onclick="this.classList.toggle('done');this.querySelector('.chore-cb').classList.toggle('on')"><div class="chore-cb"></div><div class="chore-text">Wipe down counters</div><div class="chore-freq">Daily</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /screen -->
+
+<!-- Settings panel -->
+<div id="settings-panel">
+  <div class="settings-title">Settings</div>
+  <div class="settings-row">
+    <div class="settings-label">Theme</div>
+    <div class="theme-toggle">
+      <div class="theme-btn active" id="btn-dark" onclick="setTheme('dark')">🌙 Dark</div>
+      <div class="theme-btn" id="btn-light" onclick="setTheme('light')">☀️ Light</div>
+    </div>
+  </div>
+</div>
+
+
+<div id="agent-panel">
+  <div style="font-size:0.78em;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#5f5e5a;margin-bottom:0.6em;">Agent inbox · 2 new</div>
+  <div class="agent-item"><div class="agent-from">via email · today 6:14am</div><div class="agent-msg">"Add dentist appt for Emery Mar 21 at 2pm" — added to calendar ✓</div></div>
+  <div class="agent-item"><div class="agent-from">via email · yesterday 9:02pm</div><div class="agent-msg">"Add milk to groceries" — added to list ✓</div></div>
+</div>
+
+<!-- Event detail side panel -->
+<div id="event-panel">
+  <div class="ep-header">
+    <span class="ep-close" onclick="closeEvent()">✕</span>
+    <div class="ep-title" id="ep-title">Event title</div>
+    <div class="ep-cal" id="ep-cal">Family Calendar</div>
+  </div>
+  <div class="ep-body">
+    <div class="ep-row">
+      <div class="ep-icon">🗓️</div>
+      <div><div class="ep-label">Date</div><div class="ep-val" id="ep-date">—</div></div>
+    </div>
+    <div class="ep-divider"></div>
+    <div class="ep-row">
+      <div class="ep-icon">🕐</div>
+      <div><div class="ep-label">Time</div><div class="ep-val" id="ep-time">—</div></div>
+    </div>
+    <div class="ep-divider"></div>
+    <div class="ep-row">
+      <div class="ep-icon">👤</div>
+      <div><div class="ep-label">Who</div><div class="ep-val" id="ep-who">—</div></div>
+    </div>
+    <div class="ep-divider"></div>
+    <div class="ep-row" id="ep-loc-row">
+      <div class="ep-icon">📍</div>
+      <div><div class="ep-label">Location</div><div class="ep-val" id="ep-loc">—</div></div>
+    </div>
+    <div class="ep-divider" id="ep-loc-div"></div>
+    <div class="ep-row" id="ep-notes-row">
+      <div class="ep-icon">📝</div>
+      <div><div class="ep-label">Notes</div><div class="ep-val" id="ep-notes">—</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Weather day detail panel -->
+<div id="wx-day-panel">
+  <div class="wx-dp-header">
+    <div class="wx-dp-icon" id="wx-dp-icon">☀️</div>
+    <div class="wx-dp-info">
+      <div class="wx-dp-day" id="wx-dp-day">Day</div>
+      <div class="wx-dp-desc" id="wx-dp-desc">Condition</div>
+    </div>
+    <div class="wx-dp-close" onclick="closeWxDay()">✕</div>
+  </div>
+  <div class="wx-dp-body">
+    <div class="wx-dp-temps">
+      <div class="wx-dp-temp-block"><div class="wx-dp-temp-label">High</div><div class="wx-dp-temp-val" id="wx-dp-hi">—</div></div>
+      <div class="wx-dp-temp-block"><div class="wx-dp-temp-label">Low</div><div class="wx-dp-temp-val" id="wx-dp-lo">—</div></div>
+    </div>
+    <div class="wx-dp-stats" id="wx-dp-stats"></div>
+    <div>
+      <div style="font-size:0.72em;color:#5f5e5a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5em;">Hourly</div>
+      <div class="wx-dp-hourly" id="wx-dp-hourly"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /aspect-wrap -->
+<script>
+
+// ── Theme switching ──
+function setTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('fh-theme', theme);
+  document.getElementById('btn-dark').classList.toggle('active', theme==='dark');
+  document.getElementById('btn-light').classList.toggle('active', theme==='light');
+}
+// Load saved theme on startup
+(function(){
+  const saved = localStorage.getItem('fh-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('btn-dark').classList.toggle('active', saved==='dark');
+    document.getElementById('btn-light').classList.toggle('active', saved==='light');
+  });
+})();
+
+// ── Page navigation ──
+const pages = ['home','calendar','tasks','groceries','chores','home-control','weather'];
+function setPage(p){
+  pages.forEach(id=>{
+    document.getElementById('page-'+id).classList.toggle('active', id===p);
+    document.getElementById('nav-'+id).classList.toggle('active', id===p);
+  });
+  document.getElementById('agent-panel').classList.remove('show');
+  closeEvent();
+  closeWxDay();
+}
+
+// ── Home calendar view toggle ──
+const calViews = ['month','week','next5','agenda'];
+function setCalView(v){
+  calViews.forEach(id=>{
+    const el = document.getElementById('cal-'+id);
+    el.style.display = (id===v) ? 'flex' : 'none';
+    if(id===v) el.style.flexDirection = 'column';
+    document.getElementById('tog-'+id).classList.toggle('on', id===v);
+  });
+}
+setCalView('week');
+
+// ── Full calendar page view toggle ──
+const fcViews = ['month','week','agenda'];
+function setFCView(v){
+  fcViews.forEach(id=>{
+    const el = document.getElementById('fc-'+id);
+    el.style.display = (id===v) ? 'flex' : 'none';
+    if(id===v) el.style.flexDirection = 'column';
+    document.getElementById('fc-tog-'+id).classList.toggle('on', id===v);
+  });
+}
+
+// ── Calendar person filter (visual only until Phase 3 — real data needed to hide/show events) ──
+function toggleCPill(el){
+  const allPill = el.parentElement.querySelector('.cpill:first-child');
+  if(el === allPill){
+    const allOn = !allPill.classList.contains('on');
+    el.parentElement.querySelectorAll('.cpill').forEach(p=>p.classList.toggle('on', allOn));
+  } else {
+    el.classList.toggle('on');
+    const pills = [...el.parentElement.querySelectorAll('.cpill:not(:first-child)')];
+    allPill.classList.toggle('on', pills.every(p=>p.classList.contains('on')));
+    // TODO: wire to actual event visibility when real data is added
+  }
+}
+
+// ── Task filtering ──
+let activePersonFilter = 'all';
+let activeTimeFilter = 'all';
+
+function applyTaskFilter(el, type){
+  const val = el.dataset[type==='person' ? 'person' : 'time'];
+  el.closest('.filter-row').querySelectorAll('.fpill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  if(type==='person') activePersonFilter = val;
+  else activeTimeFilter = val;
+  filterTaskItems();
+}
+
+function filterTaskItems(){
+  const items = document.querySelectorAll('#task-list .task-item');
+  const heads = document.querySelectorAll('#task-list .task-section-head');
+  items.forEach(item=>{
+    const personOk = activePersonFilter==='all' || item.dataset.person===activePersonFilter;
+    const timeOk = activeTimeFilter==='all' || item.dataset.time===activeTimeFilter;
+    item.style.display = (personOk && timeOk) ? '' : 'none';
+  });
+  heads.forEach(head=>{
+    let next = head.nextElementSibling;
+    let hasVisible = false;
+    while(next && !next.classList.contains('task-section-head')){
+      if(next.style.display !== 'none') hasVisible = true;
+      next = next.nextElementSibling;
+    }
+    head.style.display = hasVisible ? '' : 'none';
+  });
+}
+
+// ── Event detail panel ──
+function openEvent(title, date, time, who, color, location, notes){
+  closeWxDay();
+  document.getElementById('ep-title').textContent = title;
+  document.getElementById('ep-date').textContent = date;
+  document.getElementById('ep-time').textContent = time;
+  document.getElementById('ep-who').textContent = who;
+  const locRow = document.getElementById('ep-loc-row');
+  const locDiv = document.getElementById('ep-loc-div');
+  const notesRow = document.getElementById('ep-notes-row');
+  if(location){ document.getElementById('ep-loc').textContent = location; locRow.style.display=''; locDiv.style.display=''; }
+  else { locRow.style.display='none'; locDiv.style.display='none'; }
+  if(notes){ document.getElementById('ep-notes').textContent = notes; notesRow.style.display=''; }
+  else { notesRow.style.display='none'; }
+  const colorMap = {teal:'#5DCAA5',coral:'#F0997B',purple:'#AFA9EC'};
+  document.getElementById('ep-title').style.cssText = `border-left:3px solid ${colorMap[color]||'#888'};padding-left:0.5em;font-size:1.05em;font-weight:500;color:#f0ede8;margin-bottom:0.3em;padding-right:1.5em;`;
+  document.getElementById('event-panel').classList.add('open');
+}
+function closeEvent(){
+  document.getElementById('event-panel').classList.remove('open');
+}
+
+// ── Navigate from home calendar to calendar tab + open event ──
+function navToEvent(title, date, time, who, color, location, notes){
+  setPage('calendar');
+  setTimeout(()=>openEvent(title, date, time, who, color, location, notes), 50);
+}
+
+// ── Weather day detail panel ──
+function openWxDay(day, icon, desc, hi, lo, humidity, wind, uv, sunrise, sunset, hours){
+  closeEvent();
+  document.getElementById('wx-dp-day').textContent = day;
+  document.getElementById('wx-dp-icon').textContent = icon;
+  document.getElementById('wx-dp-desc').textContent = desc;
+  document.getElementById('wx-dp-hi').textContent = hi;
+  document.getElementById('wx-dp-lo').textContent = lo;
+  const stats = [['Humidity',humidity],['Wind',wind],['UV Index',uv],['Sunrise',sunrise],['Sunset',sunset]];
+  document.getElementById('wx-dp-stats').innerHTML = stats.map(([l,v])=>
+    `<div class="wx-dp-stat"><div class="wx-dp-stat-label">${l}</div><div class="wx-dp-stat-val">${v}</div></div>`
+  ).join('');
+  document.getElementById('wx-dp-hourly').innerHTML = hours.map(([t,ic,temp,pop])=>
+    `<div class="wx-dp-hour-row"><span class="wx-dp-hour-time">${t}</span><span class="wx-dp-hour-ic">${ic}</span><span class="wx-dp-hour-temp">${temp}</span>${pop?`<span class="wx-dp-hour-pop">💧${pop}</span>`:''}</div>`
+  ).join('');
+  document.getElementById('wx-day-panel').classList.add('open');
+}
+function closeWxDay(){
+  document.getElementById('wx-day-panel').classList.remove('open');
+}
+
+// ── Grocery store switching ──
+let activeStore = 'grocery';
+const storeLabels = {grocery:'Grocery store', costco:'Costco', other:'Other'};
+
+function setStore(store){
+  activeStore = store;
+  ['grocery','costco','other'].forEach(s=>{
+    const btn = document.getElementById('store-'+s);
+    const list = document.getElementById('list-'+s);
+    const isActive = s === store;
+    btn.style.background = isActive ? 'rgba(55,138,221,0.18)' : 'rgba(255,255,255,0.03)';
+    btn.style.borderColor = isActive ? 'rgba(55,138,221,0.35)' : 'rgba(255,255,255,0.08)';
+    btn.style.color = isActive ? '#85B7EB' : '#888780';
+    list.style.display = isActive ? 'flex' : 'none';
+    if(isActive) list.style.flexDirection = 'column';
+  });
+  const count = document.querySelectorAll(`#list-${store} .g-full-item`).length;
+  document.getElementById('grocery-subtitle').textContent = `${storeLabels[store]} · ${count} items`;
+}
+
+// ── Frequent grocery items — add to active store list ──
+function addFreqItem(el){
+  const isAdded = el.classList.toggle('added');
+  const rawName = el.textContent.replace('✓ ','').trim().replace(/^\S+\s/,'');
+  el.textContent = isAdded ? `✓ ${rawName}` : el.textContent.replace('✓ ','');
+  if(isAdded){
+    const list = document.getElementById('list-'+activeStore);
+    if(list){
+      const item = document.createElement('div');
+      item.className = 'g-full-item';
+      item.innerHTML = `<div class="g-full-cb"></div><span class="g-full-text">${rawName}</span>`;
+      item.onclick = ()=>{ item.classList.toggle('checked'); item.querySelector('.g-full-cb').classList.toggle('on'); };
+      list.appendChild(item);
+    }
+  }
+}
+
+// ── Clear checked grocery items ──
+function clearCheckedGroceries(){
+  document.querySelectorAll(`#list-${activeStore} .g-full-item.checked`).forEach(el=>el.remove());
+}
+
+// ── Add grocery item via input ──
+function addGroceryItem(){
+  const input = document.getElementById('grocery-add-input');
+  const text = input.value.trim();
+  if(!text) return;
+  const list = document.getElementById('list-'+activeStore);
+  const item = document.createElement('div');
+  item.className = 'g-full-item';
+  item.innerHTML = `<div class="g-full-cb"></div><span class="g-full-text">${text}</span>`;
+  item.onclick = ()=>{ item.classList.toggle('checked'); item.querySelector('.g-full-cb').classList.toggle('on'); };
+  list.appendChild(item);
+  input.value = '';
+}
+
+// ── Home Control ──
+function toggleDevice(id){
+  const dev = document.getElementById('dev-'+id);
+  const tog = document.getElementById('tog-'+id);
+  const dim = document.getElementById('dim-'+id);
+  const isOn = dev.classList.toggle('on');
+  tog.classList.toggle('on', isOn);
+  if(dim) dim.classList.toggle('show', isOn);
+}
+
+let thermVal = 70;
+function adjustTherm(d){
+  thermVal = Math.min(85, Math.max(60, thermVal+d));
+  document.getElementById('therm-set').textContent = thermVal+'°';
+}
+
+function toggleGarage(){
+  const g = document.getElementById('garage-door');
+  const s = document.getElementById('garage-status');
+  const b = document.getElementById('garage-btn');
+  const isOpen = g.classList.toggle('open');
+  s.textContent = isOpen ? 'Open' : 'Closed';
+  b.textContent = isOpen ? 'Close' : 'Open';
+}
+
+const scenes = ['normal','evening','movie','away','sleep','alloff'];
+function setScene(s){
+  scenes.forEach(id=>document.getElementById('scene-'+id).classList.toggle('active',id===s));
+}
+</script>
+</body>
+</html>
