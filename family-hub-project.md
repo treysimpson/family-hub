@@ -86,7 +86,6 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 
 | # | Task | Phase | Notes |
 |---|------|-------|-------|
-| T-04 | Set up Google Cloud project + OAuth | Phase 3 | One-time trickiest step. Unlocks all Google APIs. |
 | T-05 | Wire up weather (Open-Meteo) | Phase 3 | Free, no auth. Westminster, CO coords. Replace dummy weather data. |
 | T-06 | Wire up Google Calendar API | Phase 3 | Month + week + agenda views. Enable person filter. |
 | T-07 | Wire up Google Tasks API | Phase 3 | Today / this week / by date. Enable task filters. |
@@ -116,6 +115,7 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 | T-02 | Scaffold Vite + React app | 2026-08-05 | Vite/React scaffold merged into repo root, base path set to `/family-hub/`. Panel conversion from mockup tracked separately as T-02b. |
 | T-03 | Deploy skeleton to GitHub Pages | 2026-08-05 | Live at https://treysimpson.github.io/family-hub/ via GitHub Actions (deploys automatically on push to master) |
 | T-02b | Convert each mockup panel to a React component | 2026-08-05 | All 7 panels ported (Home, Calendar, Tasks, Groceries, Chores, Home Control, Weather) with working filters/toggles/add-item state, event + weather-day detail panels, settings panel with persisted theme. Consolidated the mockup's duplicated month/week/agenda dummy data into one shared model (src/data/mockData.js) with reusable MonthView/WeekView/AgendaView components, so real Google Calendar data (T-06) can slot in without restructuring. Fixed a layout bug carried over from the mockup: `.aspect-wrap` had no `overflow:hidden`, so closed side panels (hidden via `transform: translateX(100%)`) were visible outside the screen bounds. Verified visually in both themes via Claude in Chrome. |
+| T-04 | Set up Google Cloud project + OAuth | 2026-08-05 | GCP project "Family Hub" (ID `family-hub-504703`), Calendar API + Tasks API enabled. OAuth consent screen: External audience, Testing publishing status (no verification needed for a 2-person app), scopes `auth/calendar` + `auth/tasks`, test users wdsimpson3@gmail.com + beryl131@gmail.com. Web OAuth client "Family Hub Web Client" created with authorized JS origins `https://treysimpson.github.io` and `http://localhost:5183` (no redirect URI — app will use Google Identity Services' browser token flow, no backend). Client ID: `214844293769-vrmfljk6r20969u86vkb4706e4p7gkrd.apps.googleusercontent.com` (safe to reference in frontend code/config — not secret for public clients). Client secret was shown once but is unused and wasn't saved anywhere. |
 
 ---
 
@@ -129,6 +129,8 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 - **Google Keep has no API for personal accounts** — Keep API is Workspace-only (admin-approved business accounts). Dropped from the plan 2026-08-05; everything Keep would've done lives in Google Tasks instead.
 - **One Google OAuth setup covers Calendar + Tasks** — same credentials, no Keep scope needed.
 - **OAuth requires a real URL** — set up GitHub Pages deploy before configuring Google Cloud OAuth consent screen.
+- **OAuth app stays in "Testing" mode** — External audience, only the 2 test users (Trey + Beryl) can authorize it; no Google app verification needed since it never goes to Production. If either sign-in ever fails with an "app not verified" or "access blocked" error, check that their email is still listed under Audience → Test users in the Google Auth Platform console.
+- **Beryl must complete her own Google sign-in/consent** the first time she uses the app on her device — Trey authorizing doesn't cover her account.
 - **Use Claude Code for Phase 3** — much better than chat for file editing, running commands, and iterating on a real codebase. Use GitHub to sync across machines.
 - **Dark theme contrast** — defer readability tuning until app is on the actual wall display. Hardware + ambient light affects this significantly.
 - **Open-Meteo for weather** — free, no API key, no auth. Just lat/long. Perfect for this use case.
