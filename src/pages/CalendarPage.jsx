@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext';
 import MonthView from '../components/calendar/MonthView';
 import WeekView from '../components/calendar/WeekView';
 import AgendaView from '../components/calendar/AgendaView';
-import { monthGrid, weekDays, agendaGroups } from '../data/mockData';
 
 const FC_VIEWS = [
   { id: 'month', label: 'Month' },
@@ -20,9 +19,13 @@ const PERSON_PILLS = [
 ];
 
 export default function CalendarPage() {
-  const { openEvent } = useApp();
+  const { openEvent, calendarViews } = useApp();
   const [fcView, setFcView] = useState('week');
-  // Visual-only until real calendar data lands (T-06) — see family-hub-project.md.
+  const { monthGrid, weekDays, agendaGroups, live } = calendarViews;
+  const monthLabel = live ? new Date().toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'March / April 2026';
+  // Person filter pills stay visual-only: a single primary Google Calendar has no
+  // reliable per-family-member data to filter by (would need separate per-person
+  // calendars merged together — a possible future enhancement).
   const [activePersons, setActivePersons] = useState(() => new Set(PERSON_PILLS.map((p) => p.id)));
 
   const togglePerson = (id) => {
@@ -40,7 +43,7 @@ export default function CalendarPage() {
     <div className="page active" id="page-calendar" style={{ flexDirection: 'column', padding: '1em' }}>
       <div className="card" style={{ flex: 1, minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5em', flexShrink: 0 }}>
-          <div className="card-label" style={{ marginBottom: 0 }}>Calendar — March / April 2026</div>
+          <div className="card-label" style={{ marginBottom: 0 }}>Calendar — {monthLabel}</div>
           <div style={{ display: 'flex', gap: '0.3em' }}>
             {FC_VIEWS.map((v) => (
               <div key={v.id} className={`tog${fcView === v.id ? ' on' : ''}`} onClick={() => setFcView(v.id)}>

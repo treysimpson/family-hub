@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { AuthProvider } from './context/AuthContext';
 import TopBar from './components/TopBar';
 import SettingsPanel from './components/panels/SettingsPanel';
 import AgentPanel from './components/panels/AgentPanel';
@@ -48,8 +49,10 @@ function Screen() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <Screen />
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <Screen />
+      </AppProvider>
+    </AuthProvider>
   );
 }

@@ -153,6 +153,7 @@ export async function fetchWeather({ latitude, longitude, timezone } = WESTMINST
       ]);
 
     return {
+      date: dateStr,
       day: dayLabel(dateStr, i),
       name: fullDayLabel(dateStr),
       icon: iconFor(data.daily.weather_code[i]),

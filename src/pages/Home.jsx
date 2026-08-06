@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import MonthView from '../components/calendar/MonthView';
 import WeekView from '../components/calendar/WeekView';
 import AgendaView from '../components/calendar/AgendaView';
-import { monthGrid, weekDays, next5Days, agendaGroups, people, familySummary, homeGroceryTeaser } from '../data/mockData';
+import { people, familySummary, homeGroceryTeaser } from '../data/mockData';
 
 const CAL_VIEWS = [
   { id: 'month', label: 'Month' },
@@ -13,15 +13,17 @@ const CAL_VIEWS = [
 ];
 
 export default function Home() {
-  const { setPage, navToEvent } = useApp();
+  const { setPage, navToEvent, calendarViews } = useApp();
   const [calView, setCalView] = useState('week');
+  const { monthGrid, weekDays, next5Days, agendaGroups, live } = calendarViews;
+  const monthLabel = live ? new Date().toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'March 2026';
 
   return (
     <div className="page active" id="page-home">
       <div className="main-col">
         <div className="card cal-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6em', flexShrink: 0 }}>
-            <div className="card-label" style={{ marginBottom: 0 }}>Calendar — March 2026</div>
+            <div className="card-label" style={{ marginBottom: 0 }}>Calendar — {monthLabel}</div>
             <div style={{ display: 'flex', gap: '0.3em' }}>
               {CAL_VIEWS.map((v) => (
                 <div key={v.id} className={`tog${calView === v.id ? ' on' : ''}`} onClick={() => setCalView(v.id)}>
