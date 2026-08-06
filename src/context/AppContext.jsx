@@ -3,6 +3,10 @@ import { fetchWeather } from '../lib/weather';
 import { fetchEvents } from '../lib/googleCalendar';
 import { buildMonthGrid, buildWeekDays, buildNextNDays, buildAgendaGroups } from '../lib/buildCalendarViews';
 import { startOfWeek, addDays } from '../lib/dateGrid';
+import {
+  PERSON_LISTS, STORE_LISTS, ensureTaskLists, fetchTasks,
+  insertTask, setTaskStatus, deleteTask, clearCompletedTasks,
+} from '../lib/googleTasks';
 import { useAuth } from './AuthContext';
 import {
   monthGrid as mockMonthGrid, weekDays as mockWeekDays, next5Days as mockNext5Days,
@@ -12,6 +16,19 @@ import {
 const AppContext = createContext(null);
 const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const CALENDAR_REFRESH_MS = 5 * 60 * 1000;
+const TASKS_REFRESH_MS = 5 * 60 * 1000;
+const ALL_LISTS = { ...PERSON_LISTS, ...STORE_LISTS };
+
+function normalizeTask(raw, listKey, listId) {
+  return {
+    id: raw.id,
+    listId,
+    key: listKey,
+    text: raw.title,
+    done: raw.status === 'completed',
+    due: raw.due ? raw.due.slice(0, 10) : null,
+  };
+}
 
 export function AppProvider({ children }) {
   const { isSignedIn, accessToken } = useAuth();
@@ -25,6 +42,9 @@ export function AppProvider({ children }) {
   const [weatherError, setWeatherError] = useState(null);
   const [calendarEvents, setCalendarEvents] = useState(null);
   const [calendarError, setCalendarError] = useState(null);
+  const [taskListIds, setTaskListIds] = useState(null);
+  const [rawTasks, setRawTasks] = useState(null); // flat array across all 7 lists
+  const [tasksError, setTasksError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +77,67 @@ export function AppProvider({ children }) {
     return () => { cancelled = true; clearInterval(id); };
   }, [isSignedIn, accessToken]);
 
+  useEffect(() => {
+    if (!isSignedIn || !accessToken) { setTaskListIds(null); setRawTasks(null); return; }
+    let cancelled = false;
+
+    const loadAll = async (listIds) => {
+      const all = [];
+      for (const [key, listId] of Object.entries(listIds)) {
+        const items = await fetchTasks(accessToken, listId);
+        all.push(...items.map((raw) => normalizeTask(raw, key, listId)));
+      }
+      if (!cancelled) { setRawTasks(all); setTasksError(null); }
+    };
+
+    (async () => {
+      try {
+        const listIds = taskListIds || await ensureTaskLists(accessToken, ALL_LISTS);
+        if (cancelled) return;
+        setTaskListIds(listIds);
+        await loadAll(listIds);
+      } catch (err) {
+        if (!cancelled) setTasksError(err.message);
+      }
+    })();
+
+    const id = setInterval(() => { if (taskListIds) loadAll(taskListIds); }, TASKS_REFRESH_MS);
+    return () => { cancelled = true; clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, accessToken]);
+
+  const refetchTasks = useCallback(async () => {
+    if (!accessToken || !taskListIds) return;
+    const all = [];
+    for (const [key, listId] of Object.entries(taskListIds)) {
+      const items = await fetchTasks(accessToken, listId);
+      all.push(...items.map((raw) => normalizeTask(raw, key, listId)));
+    }
+    setRawTasks(all);
+  }, [accessToken, taskListIds]);
+
+  const toggleTaskLive = useCallback(async (task) => {
+    setRawTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
+    await setTaskStatus(accessToken, task.listId, task.id, !task.done);
+  }, [accessToken]);
+
+  const addTaskLive = useCallback(async (listKey, text) => {
+    const listId = taskListIds[listKey];
+    const created = await insertTask(accessToken, listId, { title: text });
+    setRawTasks((prev) => [...prev, normalizeTask(created, listKey, listId)]);
+  }, [accessToken, taskListIds]);
+
+  const deleteTaskLive = useCallback(async (task) => {
+    setRawTasks((prev) => prev.filter((t) => t.id !== task.id));
+    await deleteTask(accessToken, task.listId, task.id);
+  }, [accessToken]);
+
+  const clearCheckedLive = useCallback(async (listKey) => {
+    const listId = taskListIds[listKey];
+    setRawTasks((prev) => prev.filter((t) => !(t.key === listKey && t.done)));
+    await clearCompletedTasks(accessToken, listId);
+  }, [accessToken, taskListIds]);
+
   const weatherByDate = useMemo(() => {
     const map = new Map();
     for (const day of weather?.daily || []) map.set(day.date, day);
@@ -76,6 +157,16 @@ export function AppProvider({ children }) {
       live: true,
     };
   }, [isSignedIn, calendarEvents, weatherByDate]);
+
+  const tasksLive = isSignedIn && !!rawTasks;
+  const personTasks = useMemo(
+    () => (rawTasks || []).filter((t) => t.key in PERSON_LISTS),
+    [rawTasks],
+  );
+  const groceryTasks = useMemo(
+    () => (rawTasks || []).filter((t) => t.key in STORE_LISTS),
+    [rawTasks],
+  );
 
   const setTheme = useCallback((t) => {
     setThemeState(t);
@@ -129,6 +220,8 @@ export function AppProvider({ children }) {
     settingsPanelOpen, toggleSettingsPanel,
     weather, weatherError,
     calendarViews, calendarError,
+    tasksLive, personTasks, groceryTasks, tasksError,
+    toggleTaskLive, addTaskLive, deleteTaskLive, clearCheckedLive, refetchTasks,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

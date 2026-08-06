@@ -13,10 +13,14 @@ const CAL_VIEWS = [
 ];
 
 export default function Home() {
-  const { setPage, navToEvent, calendarViews } = useApp();
+  const { setPage, navToEvent, calendarViews, tasksLive, groceryTasks, toggleTaskLive } = useApp();
   const [calView, setCalView] = useState('week');
   const { monthGrid, weekDays, next5Days, agendaGroups, live } = calendarViews;
   const monthLabel = live ? new Date().toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'March 2026';
+
+  const groceryPreview = tasksLive
+    ? groceryTasks.filter((t) => t.key === 'grocery').slice(0, 6)
+    : homeGroceryTeaser.map((item, i) => ({ id: `mock-${i}`, text: item.text, done: item.done }));
 
   return (
     <div className="page active" id="page-home">
@@ -65,8 +69,12 @@ export default function Home() {
 
         <div className="card" style={{ flex: 1 }}>
           <div className="card-label">Groceries</div>
-          {homeGroceryTeaser.map((item) => (
-            <div className="g-item tappable" key={item.text} onClick={() => setPage('groceries')}>
+          {groceryPreview.map((item) => (
+            <div
+              className="g-item tappable"
+              key={item.id}
+              onClick={() => (tasksLive ? toggleTaskLive(item) : setPage('groceries'))}
+            >
               <div className={`check-box${item.done ? ' done' : ''}`} />
               <span className={`g-text${item.done ? ' done' : ''}`}>{item.text}</span>
             </div>

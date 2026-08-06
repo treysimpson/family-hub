@@ -1,34 +1,40 @@
 import { useState } from 'react';
+import { useApp } from '../context/AppContext';
 import { initialGroceries, storeLabels, storeIcons, frequentGroceryItems } from '../data/mockData';
 
 const STORES = ['grocery', 'costco', 'other'];
 
 export default function GroceriesPage() {
-  const [lists, setLists] = useState(initialGroceries);
+  const { tasksLive, groceryTasks, toggleTaskLive, addTaskLive, clearCheckedLive } = useApp();
+  const [mockLists, setMockLists] = useState(initialGroceries);
   const [activeStore, setActiveStore] = useState('grocery');
   const [addedFreq, setAddedFreq] = useState(() => new Set());
   const [newItemText, setNewItemText] = useState('');
 
-  const toggleItem = (store, id) => {
-    setLists((prev) => ({
-      ...prev,
-      [store]: prev[store].map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
-    }));
+  const lists = tasksLive
+    ? Object.fromEntries(STORES.map((store) => [
+        store,
+        groceryTasks.filter((t) => t.key === store).map((t) => ({ id: t.id, text: t.text, done: t.done, raw: t })),
+      ]))
+    : mockLists;
+
+  const toggleItem = (store, item) => {
+    if (tasksLive) toggleTaskLive(item.raw);
+    else setMockLists((prev) => ({ ...prev, [store]: prev[store].map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) }));
   };
 
   const addItem = (store, text) => {
     if (!text.trim()) return;
-    setLists((prev) => ({
-      ...prev,
-      [store]: [...prev[store], { id: `${store}-${Date.now()}`, text: text.trim(), done: false }],
-    }));
+    if (tasksLive) {
+      addTaskLive(store, text.trim());
+    } else {
+      setMockLists((prev) => ({ ...prev, [store]: [...prev[store], { id: `${store}-${Date.now()}`, text: text.trim(), done: false }] }));
+    }
   };
 
   const clearChecked = () => {
-    setLists((prev) => ({
-      ...prev,
-      [activeStore]: prev[activeStore].filter((item) => !item.done),
-    }));
+    if (tasksLive) clearCheckedLive(activeStore);
+    else setMockLists((prev) => ({ ...prev, [activeStore]: prev[activeStore].filter((item) => !item.done) }));
   };
 
   const toggleFreqItem = (chip) => {
@@ -105,7 +111,7 @@ export default function GroceriesPage() {
             <div
               key={item.id}
               className={`g-full-item${item.done ? ' checked' : ''}`}
-              onClick={() => toggleItem(activeStore, item.id)}
+              onClick={() => toggleItem(activeStore, item)}
             >
               <div className={`g-full-cb${item.done ? ' on' : ''}`} />
               <span className="g-full-text">{item.text}</span>

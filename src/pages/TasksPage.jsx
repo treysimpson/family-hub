@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useApp } from '../context/AppContext';
 import { initialTasks, taskSectionOrder, taskSectionLabels } from '../data/mockData';
 
 const PERSON_PILLS = [
@@ -16,20 +17,60 @@ const TIME_PILLS = [
   { id: 'later', label: 'Later' },
 ];
 
+function timeBucket(dueStr) {
+  if (!dueStr) return 'later';
+  const due = new Date(`${dueStr}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due - today) / 86400000);
+  if (diffDays <= 0) return 'today';
+  if (diffDays <= 7) return 'week';
+  return 'later';
+}
+
+function dueLabel(dueStr, done) {
+  if (done) return 'Done';
+  if (!dueStr) return 'No due date';
+  const due = new Date(`${dueStr}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due - today) / 86400000);
+  if (diffDays === 0) return 'Due today';
+  if (diffDays < 0) return 'Overdue';
+  return due.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function personLabel(key) {
+  if (key === 'kids') return 'Kids';
+  if (key === 'family') return 'Family';
+  return key[0].toUpperCase() + key.slice(1);
+}
+
 export default function TasksPage() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const { tasksLive, personTasks, toggleTaskLive, addTaskLive } = useApp();
+  const [mockTasks, setMockTasks] = useState(initialTasks);
   const [personFilter, setPersonFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all');
   const [newTaskText, setNewTaskText] = useState('');
+  const [addPerson, setAddPerson] = useState('family');
 
-  const toggleTask = (id) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const tasks = tasksLive
+    ? personTasks.map((t) => ({ id: t.id, text: t.text, person: t.key, done: t.done, time: timeBucket(t.due), due: dueLabel(t.due, t.done), raw: t }))
+    : mockTasks;
+
+  const toggleTask = (task) => {
+    if (tasksLive) toggleTaskLive(task.raw);
+    else setMockTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
   };
 
   const addTask = () => {
     const text = newTaskText.trim();
     if (!text) return;
-    setTasks((prev) => [...prev, { id: `t-${Date.now()}`, text, person: 'family', time: 'today', due: 'Due today', done: false }]);
+    if (tasksLive) {
+      addTaskLive(personFilter === 'all' ? addPerson : personFilter, text);
+    } else {
+      setMockTasks((prev) => [...prev, { id: `t-${Date.now()}`, text, person: 'family', time: 'today', due: 'Due today', done: false }]);
+    }
     setNewTaskText('');
   };
 
@@ -70,6 +111,23 @@ export default function TasksPage() {
           ))}
         </div>
 
+        {tasksLive && (
+          <div>
+            <div className="filter-section-label">New task goes to</div>
+            <div className="filter-row">
+              {PERSON_PILLS.filter((p) => p.id !== 'all').map((p) => (
+                <div
+                  key={p.id}
+                  className={`fpill ${p.cls}${addPerson === p.id ? ' on' : ''}`}
+                  onClick={() => setAddPerson(p.id)}
+                >
+                  {p.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="add-row" style={{ marginTop: 'auto', paddingTop: '0.8em', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
           <input
             className="add-input"
@@ -98,16 +156,14 @@ export default function TasksPage() {
                   <div
                     key={task.id}
                     className={`task-item${task.done ? ' done' : ''}`}
-                    onClick={() => toggleTask(task.id)}
+                    onClick={() => toggleTask(task)}
                   >
                     <div className={`task-cb${task.done ? ' checked' : ''}`} />
                     <div>
                       <div className="task-text">{task.text}</div>
                       <div className="task-meta">
-                        <span className="task-due">{task.done ? 'Done' : task.due}</span>
-                        <span className={`task-tag tag-${task.person}`}>
-                          {task.person === 'kids' ? 'Kids' : task.person === 'family' ? 'Family' : task.person[0].toUpperCase() + task.person.slice(1)}
-                        </span>
+                        <span className={`task-due${task.due === 'Overdue' ? ' overdue' : ''}`}>{task.due}</span>
+                        <span className={`task-tag tag-${task.person}`}>{personLabel(task.person)}</span>
                       </div>
                     </div>
                   </div>
