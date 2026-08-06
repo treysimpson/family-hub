@@ -10,7 +10,7 @@
 - **Project:** A wall-mounted family command center running on a tablet or touchscreen + Raspberry Pi
 - **Owner:** Trey — Westminster, CO. Basic coding background (scientist-level scripting, not software dev). Has built simple apps with Claude before.
 - **Family:** Trey + wife Beryl (iPhone), kids Bryce and Emery
-- **Ecosystem:** Primarily Google (Gmail, Google Calendar, Google Tasks, Google Keep). Beryl on iPhone — must work cross-platform.
+- **Ecosystem:** Primarily Google (Gmail, Google Calendar, Google Tasks). Beryl on iPhone — must work cross-platform. Google Keep is **not used** — its API is Workspace-only and unavailable on personal Gmail accounts (confirmed 2026-08-05); groceries and any Keep-style lists live in Google Tasks instead (separate task lists, same OAuth).
 - **Stack decision:** Custom React app (not Home Assistant dashboard) hosted on GitHub Pages (free). Home Assistant may be added later as a hybrid backend for smart home control — designed to be addable without breaking existing code.
 - **Cost constraint:** No ongoing subscription costs. Upfront hardware/one-time costs OK.
 - **Google API note:** OAuth setup is the trickiest one-time step. Once done, all subsequent Google APIs reuse the same auth.
@@ -90,7 +90,7 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 | T-05 | Wire up weather (Open-Meteo) | Phase 3 | Free, no auth. Westminster, CO coords. Replace dummy weather data. |
 | T-06 | Wire up Google Calendar API | Phase 3 | Month + week + agenda views. Enable person filter. |
 | T-07 | Wire up Google Tasks API | Phase 3 | Today / this week / by date. Enable task filters. |
-| T-08 | Wire up Google Tasks for groceries | Phase 3 | Store-based via named task lists. |
+| T-08 | Wire up Google Tasks for groceries | Phase 3 | Store-based via named task lists. Also absorbs anything that would've used Google Keep (see T-04 note — Keep API is Workspace-only, dropped). |
 | T-09 | Set up familyhub@gmail.com AI agent | Phase 3 | Google Apps Script watches inbox, parses with LLM, writes to Google services. |
 | T-10 | (Future) Add Home Assistant for smart home | Phase 4 | Pi backend, React calls HA local REST API |
 | T-11 | (Future) Budget tab | Phase 3+ | Track household spending/budgets |
@@ -123,10 +123,11 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 
 - **Module/panel architecture from day 1** — every feature is its own React component behind a nav item. Never build monolithic pages.
 - **Google Home API is restricted** — no public API for device control. Must go through Home Assistant (Phase 4). Don't try to call Google Home directly from React.
-- **Beryl is on iPhone** — any sync mechanism must work natively on iOS. Google Tasks + Calendar + Keep all have good iOS apps. Avoid Android-only solutions.
+- **Beryl is on iPhone** — any sync mechanism must work natively on iOS. Google Tasks + Calendar both have good iOS apps. Avoid Android-only solutions.
 - **GitHub Pages is the deploy target** — static hosting, free. React app must be a static build (no Node server at runtime). Vite handles this cleanly.
 - **Google Apps Script agent is serverless** — runs on Google's infrastructure. Pi not required for the agent.
-- **One Google OAuth setup covers all Google APIs** — Calendar, Tasks, Keep, Gmail all share the same credentials once configured.
+- **Google Keep has no API for personal accounts** — Keep API is Workspace-only (admin-approved business accounts). Dropped from the plan 2026-08-05; everything Keep would've done lives in Google Tasks instead.
+- **One Google OAuth setup covers Calendar + Tasks** — same credentials, no Keep scope needed.
 - **OAuth requires a real URL** — set up GitHub Pages deploy before configuring Google Cloud OAuth consent screen.
 - **Use Claude Code for Phase 3** — much better than chat for file editing, running commands, and iterating on a real codebase. Use GitHub to sync across machines.
 - **Dark theme contrast** — defer readability tuning until app is on the actual wall display. Hardware + ambient light affects this significantly.
