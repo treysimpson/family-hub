@@ -28,7 +28,7 @@
 |-------|-------------|--------|
 | 1 — Design | Iterate on UI/UX mockups to nail look and feel | ✅ Complete |
 | 2 — Navigable mockup | Interactive mockup with dummy data, all panels clickable | ✅ Complete |
-| 3 — Real data | Convert to React, wire up Google APIs, deploy | 🔄 In progress — repo/scaffold/deploy pipeline live, panel conversion + APIs next |
+| 3 — Real data | Convert to React, wire up Google APIs, deploy | 🔄 In progress — repo/scaffold/deploy pipeline live, all panels ported to React with dummy data, Google API wiring next |
 | 4 — Smart home (optional) | Add Home Assistant hybrid for device control | Not started |
 
 ---
@@ -86,7 +86,6 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 
 | # | Task | Phase | Notes |
 |---|------|-------|-------|
-| T-02b | Convert each mockup panel to a React component | Phase 3 | Scaffold is live but still the default Vite template — Home/Calendar/Tasks/Groceries/Chores/Settings panels from family-hub-d2.5.html still need to be ported in, along with the CSS-variable theme system. Do this as its own focused pass (mockup CSS alone is large). |
 | T-04 | Set up Google Cloud project + OAuth | Phase 3 | One-time trickiest step. Unlocks all Google APIs. |
 | T-05 | Wire up weather (Open-Meteo) | Phase 3 | Free, no auth. Westminster, CO coords. Replace dummy weather data. |
 | T-06 | Wire up Google Calendar API | Phase 3 | Month + week + agenda views. Enable person filter. |
@@ -116,6 +115,7 @@ Initial mockup through Home Control tab. Dark Dakboard-inspired theme. Settled l
 | T-01 | Set up GitHub repo | 2026-08-05 | Public repo at github.com/treysimpson/family-hub (public needed for free GitHub Pages) |
 | T-02 | Scaffold Vite + React app | 2026-08-05 | Vite/React scaffold merged into repo root, base path set to `/family-hub/`. Panel conversion from mockup tracked separately as T-02b. |
 | T-03 | Deploy skeleton to GitHub Pages | 2026-08-05 | Live at https://treysimpson.github.io/family-hub/ via GitHub Actions (deploys automatically on push to master) |
+| T-02b | Convert each mockup panel to a React component | 2026-08-05 | All 7 panels ported (Home, Calendar, Tasks, Groceries, Chores, Home Control, Weather) with working filters/toggles/add-item state, event + weather-day detail panels, settings panel with persisted theme. Consolidated the mockup's duplicated month/week/agenda dummy data into one shared model (src/data/mockData.js) with reusable MonthView/WeekView/AgendaView components, so real Google Calendar data (T-06) can slot in without restructuring. Fixed a layout bug carried over from the mockup: `.aspect-wrap` had no `overflow:hidden`, so closed side panels (hidden via `transform: translateX(100%)`) were visible outside the screen bounds. Verified visually in both themes via Claude in Chrome. |
 
 ---
 
