@@ -275,52 +275,6 @@ export const scenes = [
   { id: 'alloff', icon: '⭕', label: 'All lights off' },
 ];
 
-// ── Weather ──
-export const weatherNow = {
-  icon: '☀️', temp: 58, desc: 'Sunny', location: 'Westminster, CO',
-  feelsLike: 55, high: 58, low: 42,
-  humidity: '28%', wind: '9 mph W', uv: '4 Moderate', visibility: '10 mi', sunrise: '6:42a', sunset: '7:28p',
-};
-
-export const weatherHourly = [
-  { time: 'Now', icon: '☀️', temp: 58, pop: '' },
-  { time: '9a', icon: '☀️', temp: 56, pop: '' },
-  { time: '10a', icon: '🌤️', temp: 57, pop: '' },
-  { time: '11a', icon: '🌤️', temp: 57, pop: '' },
-  { time: '12p', icon: '⛅', temp: 57, pop: '10%' },
-  { time: '1p', icon: '⛅', temp: 57, pop: '10%' },
-  { time: '2p', icon: '⛅', temp: 56, pop: '15%' },
-  { time: '3p', icon: '🌥️', temp: 55, pop: '20%' },
-  { time: '4p', icon: '🌥️', temp: 54, pop: '20%' },
-  { time: '5p', icon: '🌥️', temp: 52, pop: '20%' },
-  { time: '6p', icon: '🌧️', temp: 50, pop: '60%' },
-  { time: '7p', icon: '🌧️', temp: 48, pop: '65%' },
-];
-
-export const weatherDaily = [
-  { day: 'Today', name: 'Thursday Mar 20', icon: '☀️', desc: 'Sunny', hi: 58, lo: 42, barWidth: 70, barOffset: 20,
-    humidity: '28%', wind: '9 mph W', uv: '4 Moderate', sunrise: '6:42a', sunset: '7:28p',
-    hourly: [['6a','☀️','44°',''],['8a','☀️','50°',''],['10a','☀️','56°',''],['12p','⛅','57°','10%'],['2p','⛅','56°','15%'],['4p','🌥️','54°','20%'],['6p','🌧️','50°','60%'],['8p','🌧️','47°','65%']] },
-  { day: 'Fri', name: 'Friday Mar 21', icon: '⛅', desc: 'Partly cloudy', hi: 62, lo: 45, barWidth: 75, barOffset: 22,
-    humidity: '32%', wind: '12 mph SW', uv: '3 Moderate', sunrise: '6:40a', sunset: '7:29p',
-    hourly: [['6a','⛅','46°',''],['8a','⛅','52°',''],['10a','🌤️','58°','5%'],['12p','⛅','61°','10%'],['2p','⛅','62°','15%'],['4p','🌥️','60°','20%'],['6p','🌥️','56°','25%'],['8p','⛅','50°','15%']] },
-  { day: 'Sat', name: 'Saturday Mar 22', icon: '🌧️', desc: 'Rain showers', hi: 54, lo: 40, barWidth: 65, barOffset: 18,
-    humidity: '65%', wind: '8 mph E', uv: '1 Low', sunrise: '6:39a', sunset: '7:30p',
-    hourly: [['6a','🌥️','41°','20%'],['8a','🌧️','44°','55%'],['10a','🌧️','48°','70%'],['12p','🌧️','51°','75%'],['2p','🌧️','53°','70%'],['4p','🌦️','52°','50%'],['6p','⛅','49°','30%'],['8p','⛅','44°','20%']] },
-  { day: 'Sun', name: 'Sunday Mar 23', icon: '⛅', desc: 'Partly cloudy', hi: 59, lo: 43, barWidth: 72, barOffset: 20,
-    humidity: '40%', wind: '7 mph W', uv: '2 Low', sunrise: '6:38a', sunset: '7:31p',
-    hourly: [['6a','⛅','44°',''],['8a','🌤️','48°',''],['10a','🌤️','54°','10%'],['12p','⛅','58°','15%'],['2p','⛅','59°','15%'],['4p','⛅','57°','10%'],['6p','🌤️','53°',''],['8p','🌤️','47°','']] },
-  { day: 'Mon', name: 'Monday Mar 24', icon: '☀️', desc: 'Sunny', hi: 65, lo: 48, barWidth: 80, barOffset: 22,
-    humidity: '22%', wind: '10 mph SW', uv: '5 Moderate', sunrise: '6:36a', sunset: '7:32p',
-    hourly: [['6a','☀️','49°',''],['8a','☀️','54°',''],['10a','☀️','60°',''],['12p','☀️','64°',''],['2p','☀️','65°',''],['4p','🌤️','63°',''],['6p','🌤️','58°',''],['8p','⛅','52°','']] },
-  { day: 'Tue', name: 'Tuesday Mar 25', icon: '🌤️', desc: 'Mostly sunny', hi: 67, lo: 50, barWidth: 78, barOffset: 25,
-    humidity: '25%', wind: '11 mph W', uv: '5 Moderate', sunrise: '6:35a', sunset: '7:33p',
-    hourly: [['6a','🌤️','51°',''],['8a','☀️','56°',''],['10a','☀️','62°',''],['12p','☀️','66°',''],['2p','🌤️','67°','5%'],['4p','🌤️','65°','5%'],['6p','⛅','60°','10%'],['8p','⛅','54°','10%']] },
-  { day: 'Wed', name: 'Wednesday Mar 26', icon: '⛅', desc: 'Partly cloudy', hi: 63, lo: 46, barWidth: 74, barOffset: 22,
-    humidity: '38%', wind: '9 mph W', uv: '3 Moderate', sunrise: '6:33a', sunset: '7:34p',
-    hourly: [['6a','⛅','47°',''],['8a','🌤️','52°',''],['10a','⛅','57°','10%'],['12p','⛅','62°','15%'],['2p','⛅','63°','20%'],['4p','🌥️','61°','25%'],['6p','🌥️','56°','30%'],['8p','🌧️','50°','40%']] },
-];
-
 // ── Agent inbox ──
 export const agentInbox = [
   { from: 'via email · today 6:14am', msg: '"Add dentist appt for Emery Mar 21 at 2pm" — added to calendar ✓' },

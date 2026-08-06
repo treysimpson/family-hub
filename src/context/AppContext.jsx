@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { fetchWeather } from '../lib/weather';
 
 const AppContext = createContext(null);
+const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 
 export function AppProvider({ children }) {
   const [theme, setThemeState] = useState(() => localStorage.getItem('fh-theme') || 'dark');
@@ -9,6 +11,20 @@ export function AppProvider({ children }) {
   const [wxDayPanel, setWxDayPanel] = useState({ open: false, data: null });
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [weather, setWeather] = useState(null);
+  const [weatherError, setWeatherError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchWeather()
+        .then((data) => { if (!cancelled) { setWeather(data); setWeatherError(null); } })
+        .catch((err) => { if (!cancelled) setWeatherError(err.message); });
+    };
+    load();
+    const id = setInterval(load, WEATHER_REFRESH_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const setTheme = useCallback((t) => {
     setThemeState(t);
@@ -60,6 +76,7 @@ export function AppProvider({ children }) {
     wxDayPanel, openWxDay, closeWxDay,
     agentPanelOpen, toggleAgentPanel,
     settingsPanelOpen, toggleSettingsPanel,
+    weather, weatherError,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

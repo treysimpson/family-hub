@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { weatherNow } from '../data/mockData';
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home' },
@@ -22,7 +21,7 @@ function useClock() {
 }
 
 export default function TopBar() {
-  const { page, setPage, toggleAgentPanel, toggleSettingsPanel } = useApp();
+  const { page, setPage, toggleAgentPanel, toggleSettingsPanel, weather } = useApp();
   const now = useClock();
 
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -47,10 +46,10 @@ export default function TopBar() {
       </div>
       <div className="topbar-right">
         <div className="weather-inline" onClick={() => setPage('weather')}>
-          <span style={{ fontSize: '1.4em' }}>{weatherNow.icon}</span>
+          <span style={{ fontSize: '1.4em' }}>{weather ? weather.now.icon : '—'}</span>
           <div>
-            <div className="weather-temp">{weatherNow.temp}°F</div>
-            <div className="weather-sub">{weatherNow.location.split(',')[0]}</div>
+            <div className="weather-temp">{weather ? `${weather.now.temp}°F` : '--°F'}</div>
+            <div className="weather-sub">Westminster</div>
           </div>
         </div>
         <div className="notif-btn" onClick={toggleAgentPanel}>
