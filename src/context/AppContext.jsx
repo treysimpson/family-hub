@@ -189,28 +189,45 @@ export function AppProvider({ children }) {
     }
   }, [accessToken]);
 
-  // Renames a merchant for this transaction and remembers it so future
-  // transactions from the same raw merchant text come in already renamed
-  // (apps-script/family-agent.gs looks this up). Unlike recategorize, there
-  // is no "just this once" option — a cryptic raw merchant string (e.g.
-  // "SONDERMIND INC") is essentially always worth translating permanently.
+  // Renames every existing transaction sharing this raw merchant text (not
+  // just the one tapped), and remembers the mapping so future transactions
+  // come in already renamed too (apps-script/family-agent.gs looks this up).
+  // Unlike recategorize, there is no "just this once" option — a cryptic raw
+  // merchant string (e.g. "SONDERMIND INC") is essentially always worth
+  // translating permanently, for every occurrence of it.
   const renameMerchant = useCallback(async (transaction, displayName) => {
     const previousMerchant = transaction.merchant;
-    setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, merchant: displayName } : t)));
-    try {
-      await updateTransactionMerchant(accessToken, transaction.row, displayName);
-    } catch (err) {
-      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, merchant: previousMerchant } : t)));
-      setBudgetActionError(err.message);
-      return;
+    const normalizedPrev = previousMerchant.toLowerCase().trim();
+    const matches = budgetTransactions.filter((t) => t.merchant.toLowerCase().trim() === normalizedPrev);
+
+    setBudgetTransactions((prev) => prev.map((t) => (
+      t.merchant.toLowerCase().trim() === normalizedPrev ? { ...t, merchant: displayName } : t
+    )));
+
+    const results = await Promise.allSettled(
+      matches.map((t) => updateTransactionMerchant(accessToken, t.row, displayName)),
+    );
+    const failedRows = new Set(
+      results.map((r, i) => (r.status === 'rejected' ? matches[i].row : null)).filter((row) => row !== null),
+    );
+    if (failedRows.size) {
+      // Roll back only the rows whose write actually failed — the rest
+      // already saved successfully, so leave their optimistic update in place.
+      setBudgetTransactions((prev) => prev.map((t) => (
+        failedRows.has(t.row) ? { ...t, merchant: previousMerchant } : t
+      )));
+      setBudgetActionError(`Could not rename ${failedRows.size} of ${matches.length} matching transactions`);
+    } else {
+      setBudgetActionError(null);
     }
-    setBudgetActionError(null);
+
+    // Best-effort, same reasoning as recategorize's merchant-memory upsert.
     try {
       await upsertMerchantName(accessToken, previousMerchant, displayName);
     } catch (err) {
       console.error('Failed to save merchant name:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, budgetTransactions]);
 
   const refetchTasks = useCallback(async () => {
     if (!accessToken || !taskListIds) return;

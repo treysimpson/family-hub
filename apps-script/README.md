@@ -318,11 +318,12 @@ only that one row and leave Merchant Memory untouched.
 
 For merchant rename: tap a transaction's merchant name (not its category)
 in "Recent transactions" — it should turn into a text box. Type a new name
-and press Enter (or tap away). Check the Transactions tab — that row's
-Merchant should update immediately. Check the Merchant Names tab — a new
-row (or an updated existing one) should appear, keyed on the *original*
-raw merchant text. Then trigger a new transaction from the same raw
-merchant and confirm it comes in already renamed.
+and press Enter (or tap away). Check the Transactions tab — every existing
+row sharing that same raw merchant text should update, not just the one
+you tapped. Check the Merchant Names tab — a new row (or an updated
+existing one) should appear, keyed on the *original* raw merchant text.
+Then trigger a new transaction from the same raw merchant and confirm it
+comes in already renamed.
 
 ## Changing the category list
 
