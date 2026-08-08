@@ -1,8 +1,10 @@
 // Google Identity Services (GIS) browser token flow — no backend, no client secret.
 // https://developers.google.com/identity/oauth2/web/guides/use-token-model
 
-const CLIENT_ID = '214844293769-vrmfljk6r20969u86vkb4706e4p7gkrd.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks';
+const CLIENT_ID = '214844293769-vrmfijk6r20969u86vkb4706e4p7gkrd.apps.googleusercontent.com';
+// spreadsheets (not .readonly): the Budget page writes back manual category
+// corrections and merchant-memory entries (T-11 Phase D).
+const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/spreadsheets';
 const STORAGE_KEY = 'fh-google-token';
 
 let gisLoadPromise = null;

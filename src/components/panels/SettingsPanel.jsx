@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { hasBudgetPin, resetBudgetPin } from '../PinGate';
 
 export default function SettingsPanel() {
   const { settingsPanelOpen, theme, setTheme } = useApp();
   const { isSignedIn, signIn, signOut, signingIn, authError } = useAuth();
+  const [pinReset, setPinReset] = useState(false);
 
   return (
     <div id="settings-panel" className={settingsPanelOpen ? 'show' : ''}>
@@ -30,6 +33,26 @@ export default function SettingsPanel() {
         </button>
         {authError && (
           <div style={{ fontSize: '0.72em', color: 'var(--ev-coral-tx)' }}>{authError}</div>
+        )}
+      </div>
+      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
+        <div className="settings-label">Budget PIN</div>
+        <div style={{ fontSize: '0.78em', color: 'var(--text-muted)' }}>
+          {hasBudgetPin() ? 'A PIN is set for the Budget section.' : 'No PIN set yet — one will be requested the first time you open Budget.'}
+        </div>
+        {hasBudgetPin() && (
+          <button
+            className="add-btn"
+            style={{ justifyContent: 'center', width: '100%' }}
+            onClick={() => { resetBudgetPin(); setPinReset(true); }}
+          >
+            Forgot PIN — reset it
+          </button>
+        )}
+        {pinReset && (
+          <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>
+            PIN cleared — you'll be asked to set a new one next time you open Budget.
+          </div>
         )}
       </div>
     </div>

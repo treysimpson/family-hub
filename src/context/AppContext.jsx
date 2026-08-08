@@ -1,12 +1,16 @@
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchWeather } from '../lib/weather';
 import { fetchEvents } from '../lib/googleCalendar';
 import { buildMonthGrid, buildWeekDays, buildNextNDays, buildAgendaGroups } from '../lib/buildCalendarViews';
 import { startOfWeek, addDays } from '../lib/dateGrid';
 import {
   PERSON_LISTS, STORE_LISTS, ensureTaskLists, fetchTasks,
-  insertTask, setTaskStatus, deleteTask, clearCompletedTasks,
+  insertTask, setTaskStatus, deleteTask, clearCompletedTasks, pruneStaleCompleted,
 } from '../lib/googleTasks';
+import {
+  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchFunMoney,
+  updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
+} from '../lib/googleSheets';
 import { useAuth } from './AuthContext';
 import {
   monthGrid as mockMonthGrid, weekDays as mockWeekDays, next5Days as mockNext5Days,
@@ -16,8 +20,16 @@ import {
 const AppContext = createContext(null);
 const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const CALENDAR_REFRESH_MS = 5 * 60 * 1000;
-const TASKS_REFRESH_MS = 5 * 60 * 1000;
+const TASKS_REFRESH_MS = 30 * 1000;
+const BUDGET_REFRESH_MS = 5 * 60 * 1000;
+// Must match EXCLUDED_FROM_BUDGET in apps-script/family-agent.gs.
+const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work'];
 const ALL_LISTS = { ...PERSON_LISTS, ...STORE_LISTS };
+
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 function normalizeTask(raw, listKey, listId) {
   return {
@@ -45,6 +57,21 @@ export function AppProvider({ children }) {
   const [taskListIds, setTaskListIds] = useState(null);
   const [rawTasks, setRawTasks] = useState(null); // flat array across all 7 lists
   const [tasksError, setTasksError] = useState(null);
+  const taskListIdsRef = useRef(null); // mirrors taskListIds for the interval below, which must see live updates
+  const [budgetTransactions, setBudgetTransactions] = useState(null);
+  const [budgetError, setBudgetError] = useState(null);
+  // Separate from budgetError: that gates the whole Budget page on a fetch
+  // failure, this is transient feedback for a single failed recategorize
+  // action, shown inline rather than replacing the page content.
+  const [budgetActionError, setBudgetActionError] = useState(null);
+  const [budgetTargets, setBudgetTargets] = useState({});
+  const [fixedBillMerchants, setFixedBillMerchants] = useState([]);
+  // "YYYY-MM" of the calendar month currently shown on the Budget page —
+  // fixed, navigable boundaries rather than an implicit "always whatever
+  // now is" window. Fun Money is intentionally not scoped to this; it's a
+  // ledger-style running balance, not a monthly total.
+  const [selectedBudgetMonth, setSelectedBudgetMonth] = useState(currentMonthKey);
+  const [funMoneyEntries, setFunMoneyEntries] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,13 +105,14 @@ export function AppProvider({ children }) {
   }, [isSignedIn, accessToken]);
 
   useEffect(() => {
-    if (!isSignedIn || !accessToken) { setTaskListIds(null); setRawTasks(null); return; }
+    if (!isSignedIn || !accessToken) { taskListIdsRef.current = null; setTaskListIds(null); setRawTasks(null); return; }
     let cancelled = false;
 
     const loadAll = async (listIds) => {
       const all = [];
       for (const [key, listId] of Object.entries(listIds)) {
-        const items = await fetchTasks(accessToken, listId);
+        const rawItems = await fetchTasks(accessToken, listId);
+        const items = await pruneStaleCompleted(accessToken, listId, rawItems);
         all.push(...items.map((raw) => normalizeTask(raw, key, listId)));
       }
       if (!cancelled) { setRawTasks(all); setTasksError(null); }
@@ -92,8 +120,9 @@ export function AppProvider({ children }) {
 
     (async () => {
       try {
-        const listIds = taskListIds || await ensureTaskLists(accessToken, ALL_LISTS);
+        const listIds = taskListIdsRef.current || await ensureTaskLists(accessToken, ALL_LISTS);
         if (cancelled) return;
+        taskListIdsRef.current = listIds;
         setTaskListIds(listIds);
         await loadAll(listIds);
       } catch (err) {
@@ -101,16 +130,94 @@ export function AppProvider({ children }) {
       }
     })();
 
-    const id = setInterval(() => { if (taskListIds) loadAll(taskListIds); }, TASKS_REFRESH_MS);
+    // Reads taskListIdsRef (not the taskListIds state) so this still sees the
+    // list IDs once they're ready, despite the interval closing over the
+    // values from whenever this effect last ran.
+    const id = setInterval(() => { if (taskListIdsRef.current) loadAll(taskListIdsRef.current); }, TASKS_REFRESH_MS);
     return () => { cancelled = true; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, accessToken]);
+
+  useEffect(() => {
+    if (!isSignedIn || !accessToken) { setBudgetTransactions(null); return; }
+    let cancelled = false;
+    const load = () => {
+      fetchTransactions(accessToken)
+        .then((data) => { if (!cancelled) { setBudgetTransactions(data); setBudgetError(null); } })
+        .catch((err) => { if (!cancelled) setBudgetError(err.message); });
+      // Targets/fixed bills are user-curated and change rarely — best-effort,
+      // never surfaced as a hard error (see fetchBudgetTargets/fetchFixedBills).
+      fetchBudgetTargets(accessToken).then((data) => { if (!cancelled) setBudgetTargets(data); });
+      fetchFixedBills(accessToken).then((data) => { if (!cancelled) setFixedBillMerchants(data); });
+      fetchFunMoney(accessToken).then((data) => { if (!cancelled) setFunMoneyEntries(data); });
+    };
+    load();
+    const id = setInterval(load, BUDGET_REFRESH_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [isSignedIn, accessToken]);
+
+  // Updates the transaction's category, and — unless remember is false —
+  // saves it as a standing rule for future transactions from this merchant
+  // (apps-script/family-agent.gs consults it; this just writes the sheet,
+  // the agent does the reading). remember should be false for merchants
+  // known to span multiple categories (e.g. Target: groceries one trip,
+  // clothes another) where a blanket rule would be wrong most of the time —
+  // see BudgetPage's "just this once" vs "always" prompt. Optimistic local
+  // update, rolled back on failure so the UI never shows a category that
+  // was not actually saved (e.g. if the write scope has not been granted
+  // yet — the read-only -> read/write OAuth upgrade is a separate manual
+  // Cloud Console step).
+  const recategorizeTransaction = useCallback(async (transaction, category, remember = true) => {
+    const previousCategory = transaction.category;
+    setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category } : t)));
+    try {
+      await updateTransactionCategory(accessToken, transaction.row, category);
+    } catch (err) {
+      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category: previousCategory } : t)));
+      setBudgetActionError(err.message);
+      return;
+    }
+    setBudgetActionError(null);
+    if (!remember) return;
+    // Best-effort: the category update above is the part the user actually
+    // sees and cares about, so a memory-write failure (e.g. the Merchant
+    // Memory tab doesn't exist yet because setupBudgetSheets hasn't been run)
+    // shouldn't surface as if the whole action failed.
+    try {
+      await upsertMerchantMemory(accessToken, transaction.merchant, category);
+    } catch (err) {
+      console.error('Failed to save merchant memory:', err);
+    }
+  }, [accessToken]);
+
+  // Renames a merchant for this transaction and remembers it so future
+  // transactions from the same raw merchant text come in already renamed
+  // (apps-script/family-agent.gs looks this up). Unlike recategorize, there
+  // is no "just this once" option — a cryptic raw merchant string (e.g.
+  // "SONDERMIND INC") is essentially always worth translating permanently.
+  const renameMerchant = useCallback(async (transaction, displayName) => {
+    const previousMerchant = transaction.merchant;
+    setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, merchant: displayName } : t)));
+    try {
+      await updateTransactionMerchant(accessToken, transaction.row, displayName);
+    } catch (err) {
+      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, merchant: previousMerchant } : t)));
+      setBudgetActionError(err.message);
+      return;
+    }
+    setBudgetActionError(null);
+    try {
+      await upsertMerchantName(accessToken, previousMerchant, displayName);
+    } catch (err) {
+      console.error('Failed to save merchant name:', err);
+    }
+  }, [accessToken]);
 
   const refetchTasks = useCallback(async () => {
     if (!accessToken || !taskListIds) return;
     const all = [];
     for (const [key, listId] of Object.entries(taskListIds)) {
-      const items = await fetchTasks(accessToken, listId);
+      const rawItems = await fetchTasks(accessToken, listId);
+      const items = await pruneStaleCompleted(accessToken, listId, rawItems);
       all.push(...items.map((raw) => normalizeTask(raw, key, listId)));
     }
     setRawTasks(all);
@@ -121,9 +228,9 @@ export function AppProvider({ children }) {
     await setTaskStatus(accessToken, task.listId, task.id, !task.done);
   }, [accessToken]);
 
-  const addTaskLive = useCallback(async (listKey, text) => {
+  const addTaskLive = useCallback(async (listKey, text, due) => {
     const listId = taskListIds[listKey];
-    const created = await insertTask(accessToken, listId, { title: text });
+    const created = await insertTask(accessToken, listId, { title: text, due });
     setRawTasks((prev) => [...prev, normalizeTask(created, listKey, listId)]);
   }, [accessToken, taskListIds]);
 
@@ -167,6 +274,64 @@ export function AppProvider({ children }) {
     () => (rawTasks || []).filter((t) => t.key in STORE_LISTS),
     [rawTasks],
   );
+
+  const budgetLive = isSignedIn && !!budgetTransactions;
+
+  // All transactions dated within selectedBudgetMonth (a fixed "YYYY-MM"
+  // calendar-month boundary, not a rolling window anchored to today).
+  const selectedMonthTransactions = useMemo(() => {
+    if (!budgetTransactions) return [];
+    return budgetTransactions.filter((t) => t.date.startsWith(selectedBudgetMonth));
+  }, [budgetTransactions, selectedBudgetMonth]);
+
+  const budgetMonthTotal = useMemo(() => {
+    if (!budgetTransactions) return null;
+    return selectedMonthTransactions
+      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category))
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [budgetTransactions, selectedMonthTransactions]);
+
+  // "one-time" (major, non-recurring, e.g. an HVAC replacement) and
+  // "trey-work" (reimbursable) are both excluded from the regular monthly
+  // total/category breakdown above so they don't distort it — each gets its
+  // own separate total instead.
+  const budgetOneTimeTotal = useMemo(
+    () => selectedMonthTransactions.filter((t) => t.category === 'one-time').reduce((sum, t) => sum + t.amount, 0),
+    [selectedMonthTransactions],
+  );
+
+  const budgetReimbursableTotal = useMemo(
+    () => selectedMonthTransactions.filter((t) => t.category === 'trey-work').reduce((sum, t) => sum + t.amount, 0),
+    [selectedMonthTransactions],
+  );
+
+  const budgetCategoryTotals = useMemo(() => {
+    const totals = {};
+    selectedMonthTransactions
+      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category))
+      .forEach((t) => { totals[t.category] = (totals[t.category] || 0) + t.amount; });
+    return totals;
+  }, [selectedMonthTransactions]);
+
+  const budgetFixedTotal = useMemo(() => {
+    if (!fixedBillMerchants.length) return 0;
+    return selectedMonthTransactions
+      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category) && fixedBillMerchants.includes(t.merchant.toLowerCase()))
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [selectedMonthTransactions, fixedBillMerchants]);
+
+  const budgetDiscretionaryTotal = budgetMonthTotal === null ? null : budgetMonthTotal - budgetFixedTotal;
+
+  // Ledger-style balance: sum of every allowance/spend row ever for that
+  // person, so unspent money automatically carries into next month without
+  // any month-boundary logic — see fetchFunMoney in googleSheets.js.
+  const funMoneyBalances = useMemo(() => {
+    const balances = { trey: 0, beryl: 0 };
+    funMoneyEntries.forEach((f) => {
+      if (f.person in balances) balances[f.person] += f.amount;
+    });
+    return balances;
+  }, [funMoneyEntries]);
 
   const setTheme = useCallback((t) => {
     setThemeState(t);
@@ -222,6 +387,11 @@ export function AppProvider({ children }) {
     calendarViews, calendarError,
     tasksLive, personTasks, groceryTasks, tasksError,
     toggleTaskLive, addTaskLive, deleteTaskLive, clearCheckedLive, refetchTasks,
+    budgetLive, budgetTransactions, budgetMonthTotal, budgetError,
+    selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
+    budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
+    budgetFixedTotal, budgetDiscretionaryTotal, recategorizeTransaction, renameMerchant, budgetActionError,
+    funMoneyEntries, funMoneyBalances,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

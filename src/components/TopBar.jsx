@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { id: 'chores', label: 'Chores' },
   { id: 'home-control', label: 'Home Control' },
   { id: 'weather', label: 'Weather' },
+  { id: 'budget', label: 'Budget' },
 ];
 
 function useClock() {

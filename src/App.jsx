@@ -13,6 +13,7 @@ import GroceriesPage from './pages/GroceriesPage';
 import ChoresPage from './pages/ChoresPage';
 import HomeControlPage from './pages/HomeControlPage';
 import WeatherPage from './pages/WeatherPage';
+import BudgetPage from './pages/BudgetPage';
 
 const PAGES = {
   home: Home,
@@ -22,6 +23,7 @@ const PAGES = {
   chores: ChoresPage,
   'home-control': HomeControlPage,
   weather: WeatherPage,
+  budget: BudgetPage,
 };
 
 function Screen() {
