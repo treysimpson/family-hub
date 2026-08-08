@@ -12,8 +12,19 @@ const CAL_VIEWS = [
   { id: 'agenda', label: 'Agenda' },
 ];
 
+// Google Tasks only has 4 lists (Trey/Beryl/Kids/Family, no separate Bryce or
+// Emery lists), unlike the mock's 4 individual family members — so the live
+// version groups by list, not by person, and shows open-item counts instead
+// of a "next event" (no per-person calendar signal exists to source that from).
+const FAMILY_GROUPS = [
+  { key: 'trey', label: 'Trey', color: 'var(--tag-trey-tx)' },
+  { key: 'beryl', label: 'Beryl', color: 'var(--tag-beryl-tx)' },
+  { key: 'kids', label: 'Kids', color: 'var(--tag-kids-tx)' },
+  { key: 'family', label: 'Family', color: 'var(--tag-family-tx)' },
+];
+
 export default function Home() {
-  const { setPage, navToEvent, calendarViews, tasksLive, groceryTasks, toggleTaskLive } = useApp();
+  const { setPage, navToEvent, calendarViews, tasksLive, personTasks, groceryTasks, toggleTaskLive } = useApp();
   const [calView, setCalView] = useState('week');
   const { monthGrid, weekDays, next5Days, agendaGroups, live } = calendarViews;
   const monthLabel = live ? new Date().toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'March 2026';
@@ -21,6 +32,10 @@ export default function Home() {
   const groceryPreview = tasksLive
     ? groceryTasks.filter((t) => t.key === 'grocery').slice(0, 6)
     : homeGroceryTeaser.map((item, i) => ({ id: `mock-${i}`, text: item.text, done: item.done }));
+
+  const familyGroups = tasksLive
+    ? FAMILY_GROUPS.map((g) => ({ ...g, open: personTasks.filter((t) => t.key === g.key && !t.done) }))
+    : null;
 
   return (
     <div className="page active" id="page-home">
@@ -48,23 +63,38 @@ export default function Home() {
       <div className="side-col">
         <div className="card">
           <div className="card-label">Family</div>
-          {familySummary.map((entry) => {
-            const person = people[entry.person];
-            return (
-              <div className="person-card" key={entry.person}>
-                <div className="person-header">
-                  <div className="person-dot" style={{ background: person.color }} />
-                  <div className="person-name">{person.name}</div>
-                  <div className="person-next">{entry.next}</div>
-                </div>
-                {entry.todos.map((todo) => (
-                  <div className="person-todo tappable" key={todo} onClick={() => setPage('tasks')}>
-                    <div className="mini-check" />{todo}
+          {tasksLive
+            ? familyGroups.map((group) => (
+                <div className="person-card" key={group.key}>
+                  <div className="person-header">
+                    <div className="person-dot" style={{ background: group.color }} />
+                    <div className="person-name">{group.label}</div>
+                    <div className="person-next">{group.open.length ? `${group.open.length} open` : 'All done'}</div>
                   </div>
-                ))}
-              </div>
-            );
-          })}
+                  {group.open.slice(0, 3).map((task) => (
+                    <div className="person-todo tappable" key={task.id} onClick={() => setPage('tasks')}>
+                      <div className="mini-check" />{task.text}
+                    </div>
+                  ))}
+                </div>
+              ))
+            : familySummary.map((entry) => {
+                const person = people[entry.person];
+                return (
+                  <div className="person-card" key={entry.person}>
+                    <div className="person-header">
+                      <div className="person-dot" style={{ background: person.color }} />
+                      <div className="person-name">{person.name}</div>
+                      <div className="person-next">{entry.next}</div>
+                    </div>
+                    {entry.todos.map((todo) => (
+                      <div className="person-todo tappable" key={todo} onClick={() => setPage('tasks')}>
+                        <div className="mini-check" />{todo}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
         </div>
 
         <div className="card" style={{ flex: 1 }}>

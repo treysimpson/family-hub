@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { initialTasks, taskSectionOrder, taskSectionLabels } from '../data/mockData';
 
@@ -47,12 +47,18 @@ function personLabel(key) {
 }
 
 export default function TasksPage() {
-  const { tasksLive, personTasks, toggleTaskLive, addTaskLive } = useApp();
+  const { tasksLive, personTasks, toggleTaskLive, addTaskLive, clearCheckedLive, refetchTasks } = useApp();
   const [mockTasks, setMockTasks] = useState(initialTasks);
   const [personFilter, setPersonFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all');
   const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskDue, setNewTaskDue] = useState('');
   const [addPerson, setAddPerson] = useState('family');
+
+  // Pick up edits made directly in Google Tasks (e.g. a due date) as soon as
+  // this tab is opened, rather than waiting for the 5-minute background poll.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tasksLive) refetchTasks(); }, []);
 
   const tasks = tasksLive
     ? personTasks.map((t) => ({ id: t.id, text: t.text, person: t.key, done: t.done, time: timeBucket(t.due), due: dueLabel(t.due, t.done), raw: t }))
@@ -67,11 +73,24 @@ export default function TasksPage() {
     const text = newTaskText.trim();
     if (!text) return;
     if (tasksLive) {
-      addTaskLive(personFilter === 'all' ? addPerson : personFilter, text);
+      const due = newTaskDue ? `${newTaskDue}T00:00:00.000Z` : undefined;
+      addTaskLive(personFilter === 'all' ? addPerson : personFilter, text, due);
     } else {
       setMockTasks((prev) => [...prev, { id: `t-${Date.now()}`, text, person: 'family', time: 'today', due: 'Due today', done: false }]);
     }
     setNewTaskText('');
+    setNewTaskDue('');
+  };
+
+  // With "All" selected there's no single Google Tasks list to clear, so it
+  // clears completed items across all four person lists.
+  const clearChecked = () => {
+    if (tasksLive) {
+      const keys = personFilter === 'all' ? ['trey', 'beryl', 'kids', 'family'] : [personFilter];
+      keys.forEach((key) => clearCheckedLive(key));
+    } else {
+      setMockTasks((prev) => prev.filter((t) => !(t.done && (personFilter === 'all' || t.person === personFilter))));
+    }
   };
 
   const openCount = tasks.filter((t) => !t.done).length;
@@ -128,15 +147,42 @@ export default function TasksPage() {
           </div>
         )}
 
-        <div className="add-row" style={{ marginTop: 'auto', paddingTop: '0.8em', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
-          <input
-            className="add-input"
-            placeholder="Add a task..."
-            value={newTaskText}
-            onChange={(e) => setNewTaskText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addTask()}
-          />
-          <button className="add-btn" onClick={addTask}>Add</button>
+        {tasksLive ? (
+          <div style={{ marginTop: 'auto', paddingTop: '0.8em', borderTop: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
+            <input
+              className="add-input"
+              placeholder="Add a task..."
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addTask()}
+            />
+            <div className="add-row" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+              <input
+                type="date"
+                className="add-input"
+                value={newTaskDue}
+                onChange={(e) => setNewTaskDue(e.target.value)}
+              />
+              <button className="add-btn" onClick={addTask}>Add</button>
+            </div>
+          </div>
+        ) : (
+          <div className="add-row" style={{ marginTop: 'auto', paddingTop: '0.8em', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
+            <input
+              className="add-input"
+              placeholder="Add a task..."
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addTask()}
+            />
+            <button className="add-btn" onClick={addTask}>Add</button>
+          </div>
+        )}
+
+        <div style={{ marginTop: '0.5em' }}>
+          <button className="add-btn" style={{ width: '100%', padding: '0.5em', fontSize: '0.85em', justifyContent: 'center' }} onClick={clearChecked}>
+            Clear checked items
+          </button>
         </div>
       </div>
 

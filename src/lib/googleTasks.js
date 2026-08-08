@@ -52,8 +52,11 @@ export async function ensureTaskLists(accessToken, wanted) {
   return result;
 }
 
+// showHidden is deliberately omitted: tasks.clear() only hides completed tasks
+// rather than deleting them, so asking for hidden tasks here would bring
+// "cleared" items right back after a refresh.
 export async function fetchTasks(accessToken, listId) {
-  const data = await api(accessToken, `/lists/${listId}/tasks?showCompleted=true&showHidden=true&maxResults=100`);
+  const data = await api(accessToken, `/lists/${listId}/tasks?showCompleted=true&maxResults=100`);
   return data.items || [];
 }
 
@@ -78,4 +81,22 @@ export async function deleteTask(accessToken, listId, taskId) {
 // Removes all completed tasks from a list in one call.
 export async function clearCompletedTasks(accessToken, listId) {
   return api(accessToken, `/lists/${listId}/clear`, { method: 'POST' });
+}
+
+const STALE_COMPLETED_DAYS = 3;
+
+// Permanently deletes completed items older than STALE_COMPLETED_DAYS so lists
+// don't grow unbounded if "Clear checked items" isn't clicked regularly — the
+// clear() endpoint only hides completed tasks, it doesn't delete them, so
+// without this they'd sit there forever (see fetchTasks' showHidden comment).
+// Returns the input list with the pruned items removed.
+export async function pruneStaleCompleted(accessToken, listId, rawTasks) {
+  const cutoff = Date.now() - STALE_COMPLETED_DAYS * 24 * 60 * 60 * 1000;
+  const stale = rawTasks.filter((t) => t.status === 'completed' && t.completed && new Date(t.completed).getTime() < cutoff);
+  for (const task of stale) {
+    await deleteTask(accessToken, listId, task.id);
+  }
+  if (!stale.length) return rawTasks;
+  const staleIds = new Set(stale.map((t) => t.id));
+  return rawTasks.filter((t) => !staleIds.has(t.id));
 }

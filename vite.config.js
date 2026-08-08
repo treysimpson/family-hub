@@ -5,4 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: '/family-hub/',
   plugins: [react()],
+  server: {
+    port: 5183,
+    strictPort: true,
+  },
 })

@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { initialGroceries, storeLabels, storeIcons, frequentGroceryItems } from '../data/mockData';
 
 const STORES = ['grocery', 'costco', 'other'];
 
 export default function GroceriesPage() {
-  const { tasksLive, groceryTasks, toggleTaskLive, addTaskLive, clearCheckedLive } = useApp();
+  const { tasksLive, groceryTasks, toggleTaskLive, addTaskLive, clearCheckedLive, refetchTasks } = useApp();
   const [mockLists, setMockLists] = useState(initialGroceries);
   const [activeStore, setActiveStore] = useState('grocery');
-  const [addedFreq, setAddedFreq] = useState(() => new Set());
   const [newItemText, setNewItemText] = useState('');
+
+  // Pick up edits made directly in Google Tasks as soon as this tab is
+  // opened, rather than waiting for the 5-minute background poll.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tasksLive) refetchTasks(); }, []);
 
   const lists = tasksLive
     ? Object.fromEntries(STORES.map((store) => [
@@ -37,14 +41,14 @@ export default function GroceriesPage() {
     else setMockLists((prev) => ({ ...prev, [activeStore]: prev[activeStore].filter((item) => !item.done) }));
   };
 
+  // "Added" is derived from the list itself (an active, unchecked item with a
+  // matching name) rather than tracked separately — so checking the item off
+  // (or clearing it) automatically frees up the chip to add it again.
+  const isFreqActive = (name) => lists[activeStore].some((item) => item.text === name && !item.done);
+
   const toggleFreqItem = (chip) => {
     const name = chip.replace(/^\S+\s/, '');
-    setAddedFreq((prev) => {
-      const next = new Set(prev);
-      if (next.has(chip)) next.delete(chip);
-      else { next.add(chip); addItem(activeStore, name); }
-      return next;
-    });
+    if (!isFreqActive(name)) addItem(activeStore, name);
   };
 
   return (
@@ -71,15 +75,19 @@ export default function GroceriesPage() {
         <div className="freq-section">
           <div className="freq-label">Frequently added</div>
           <div className="freq-chips">
-            {frequentGroceryItems.map((chip) => (
-              <div
-                key={chip}
-                className={`freq-chip${addedFreq.has(chip) ? ' added' : ''}`}
-                onClick={() => toggleFreqItem(chip)}
-              >
-                {addedFreq.has(chip) ? `✓ ${chip.replace(/^\S+\s/, '')}` : chip}
-              </div>
-            ))}
+            {frequentGroceryItems.map((chip) => {
+              const name = chip.replace(/^\S+\s/, '');
+              const active = isFreqActive(name);
+              return (
+                <div
+                  key={chip}
+                  className={`freq-chip${active ? ' added' : ''}`}
+                  onClick={() => toggleFreqItem(chip)}
+                >
+                  {active ? `✓ ${name}` : chip}
+                </div>
+              );
+            })}
           </div>
         </div>
 
