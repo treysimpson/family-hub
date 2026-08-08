@@ -388,6 +388,16 @@ current category list.
   will show tax split roughly 90/10 between those two rows, not as a
   separate line. This keeps the rows summing to the real charge without
   adding a 17th category just for tax.
+- `processTargetOrderEmails` matches an order to its card-alert row within
+  $5 (`TARGET_ORDER_MATCH_TOLERANCE`), not an exact amount — Target order
+  confirmations sometimes quote a bag fee or other adjustment that does not
+  end up on the actual charge (confirmed during testing: a confirmation
+  showing $93.27 with a $1 bag fee that was never actually charged, real
+  charge $92.27). The split is always computed against the real charged
+  amount, not the email total, so this kind of gap is absorbed rather than
+  blocking the match. If you ever have two separate real Target charges
+  within $5 of each other in the same window, the closer one wins the
+  match — low risk for a household budget, but worth knowing about.
 - Target receipt import's duplicate protection is weaker than statement
   import's: once a receipt is processed, the original single-row match is
   replaced by several split rows, so if the exact same screenshot were

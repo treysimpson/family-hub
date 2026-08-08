@@ -336,24 +336,42 @@ function processTargetOrderEmails() {
   });
 }
 
-// Finds a Transactions row for this order (by Target merchant + matching
-// amount, not already tagged with this order number) and replaces it with
-// one row per category holding that category real share of the total --
-// unlike applyAmazonOrder_, this is a genuine split, not a single in-place
-// category update, since Target order emails give real per-item pricing.
+// A Target order confirmation total sometimes does not exactly match the
+// real card charge -- a quoted bag fee that ends up not being charged, a
+// weight-based price adjustment on a grocery item, or a substituted/
+// out-of-stock item are all common. $5 comfortably covers those without
+// being so loose it risks grabbing an unrelated Target charge that happens
+// to land nearby in amount.
+const TARGET_ORDER_MATCH_TOLERANCE = 5;
+
+// Finds a Transactions row for this order (Target merchant, not already
+// tagged with this order number, amount within TARGET_ORDER_MATCH_TOLERANCE
+// of the order total -- taking whichever candidate is closest, not just the
+// first) and replaces it with one row per category holding that category
+// real share of the total -- unlike applyAmazonOrder_, this is a genuine
+// split, not a single in-place category update, since Target order emails
+// give real per-item pricing. The split is computed against the row REAL
+// charged amount, not the email order total, so a small discrepancy like a
+// bag fee that was quoted but never charged is absorbed automatically
+// rather than blocking the match or throwing off the reconciled total.
 function applyTargetOrder_(sheet, order) {
   const data = sheet.getDataRange().getValues();
+  let bestIndex = -1;
+  let bestDiff = Infinity;
   for (let i = 1; i < data.length; i++) {
     const merchant = String(data[i][2] || '').toLowerCase();
     const amount = Number(data[i][3]);
     const notes = String(data[i][5] || '');
     if (merchant.indexOf('target') === -1) continue;
-    if (Math.abs(amount - order.total) > 0.01) continue;
     if (notes.indexOf(order.orderNumber) !== -1) continue;
-    splitTransactionRow_(sheet, i + 1, order.categories, order.total, 'Order ' + order.orderNumber + '; Target itemized');
-    return true;
+    const diff = Math.abs(amount - order.total);
+    if (diff > TARGET_ORDER_MATCH_TOLERANCE) continue;
+    if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
   }
-  return false;
+  if (bestIndex === -1) return false;
+  const realTotal = Number(data[bestIndex][3]);
+  splitTransactionRow_(sheet, bestIndex + 1, order.categories, realTotal, 'Order ' + order.orderNumber + '; Target itemized');
+  return true;
 }
 
 function processTargetReceiptImports() {
