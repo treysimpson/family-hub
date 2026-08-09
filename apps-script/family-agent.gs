@@ -335,7 +335,7 @@ function processTargetOrderEmails() {
       // map (not every/some), same reasoning as processAmazonOrderEmails --
       // every order in a multi-order email must be attempted regardless of
       // whether an earlier one matched.
-      const results = orders.map((order) => applyTargetOrder_(sheet, order));
+      const results = orders.map((order) => applyTargetOrder_(sheet, order, message.getId()));
       // Only record item detail for orders that actually matched this run --
       // an unmatched order retries on the next run with a fresh Gemini parse,
       // so recording items here too would duplicate them once it does match.
@@ -375,7 +375,11 @@ const TARGET_ORDER_MATCH_TOLERANCE = 5;
 // charged amount, not the email order total, so a small discrepancy like a
 // bag fee that was quoted but never charged is absorbed automatically
 // rather than blocking the match or throwing off the reconciled total.
-function applyTargetOrder_(sheet, order) {
+// emailId is the order confirmation email's own ID (not the original row's,
+// which belongs to the bank's card-alert email) -- the new split rows use
+// it so appendOrderItems_'s Details lookup (also keyed on that same ID) can
+// actually find them.
+function applyTargetOrder_(sheet, order, emailId) {
   const data = sheet.getDataRange().getValues();
   let bestIndex = -1;
   let bestDiff = Infinity;
@@ -391,7 +395,7 @@ function applyTargetOrder_(sheet, order) {
   }
   if (bestIndex === -1) return false;
   const realTotal = Number(data[bestIndex][3]);
-  splitTransactionRow_(sheet, bestIndex + 1, order.categories, realTotal, 'Order ' + order.orderNumber + '; Target itemized');
+  splitTransactionRow_(sheet, bestIndex + 1, order.categories, realTotal, 'Order ' + order.orderNumber + '; Target itemized', emailId);
   return true;
 }
 
@@ -425,7 +429,7 @@ function processTargetReceiptImports() {
         // A card-alert email already created a single coarse row for this
         // charge -- replace it with the real itemized split instead of
         // double-counting the same charge.
-        splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, 'Target receipt import');
+        splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, 'Target receipt import', message.getId());
       } else {
         // No matching card-alert row (e.g. it has not arrived yet, or the
         // purchase was not on a card with alerts enabled) -- add the split
@@ -476,14 +480,17 @@ function computeCategorySplit_(categories, total) {
 }
 
 // Replaces a single Transactions row (e.g. a coarse card-alert entry) with
-// one row per category, preserving the original row Date/Card/Merchant/
-// EmailId. Used by both Target order itemization and Target receipt import.
-function splitTransactionRow_(sheet, rowIndex, categories, total, notesTag) {
+// one row per category, preserving the original row's Date/Card/Merchant
+// but NOT its EmailId -- emailId is passed in explicitly as the order/
+// receipt email's own ID (not the original row's, which belongs to the
+// bank's card-alert email that first created it), so these new rows'
+// EmailId lines up with the same key appendOrderItems_ used for their item
+// detail. Used by both Target order itemization and Target receipt import.
+function splitTransactionRow_(sheet, rowIndex, categories, total, notesTag, emailId) {
   const row = sheet.getRange(rowIndex, 1, 1, 7).getValues()[0];
   const date = normalizeSheetDate_(row[0]);
   const card = row[1];
   const merchant = row[2];
-  const emailId = row[6];
   sheet.deleteRow(rowIndex);
   computeCategorySplit_(categories, total).forEach((c) => {
     appendTransactionRow_(sheet, { date, card, merchant, amount: c.amount, category: c.category, notes: notesTag }, emailId);
