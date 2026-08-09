@@ -311,6 +311,18 @@ by EmailId. On the Budget page, that transaction (or any of the split rows
 from the same order) should show a "Details" link; tapping it should
 expand to the item names grouped by category, no prices.
 
+**Backfilling item detail for orders/receipts processed before Order Items
+existed**: `processTargetOrderEmails`/`processTargetReceiptImports` only
+ever look at threads still under the `Target Orders`/`Target Receipt`
+label — anything already moved to `.../Done` won't be touched by a normal
+re-run, and by that point its Transactions row is already split, so even
+manually re-labeling it back would fail to match anything. Instead, run
+`backfillTargetOrderItems` and/or `backfillTargetReceiptItems` manually
+from the editor — these read the `.../Done` label directly, re-parse each
+email with Gemini, and record item names only (never touching Transactions,
+since that split already happened correctly the first time). Safe to run
+more than once; `appendOrderItems_` skips any email that already has rows.
+
 For statement import: after labeling a statement email "Statement Import"
 and running `processStatementImports` (or waiting for its trigger), check
 the Executions log for a line like "Statement import ... added N of M

@@ -999,11 +999,56 @@ function getOrCreateOrderItemsSheet_(spreadsheet) {
 // One row per item across every category in the order/receipt, so a
 // transaction's Details view (looked up by EmailId in the Hub app) shows
 // the full item list regardless of which of the split Transactions rows it
-// was opened from.
+// was opened from. Skips if this email already has rows here -- makes it
+// safe to call more than once for the same email (e.g. a backfill re-run),
+// without creating duplicate item rows.
 function appendOrderItems_(spreadsheet, emailId, categories) {
   const sheet = getOrCreateOrderItemsSheet_(spreadsheet);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0] || '') === emailId) return;
+  }
   categories.forEach((c) => {
     (c.items || []).forEach((item) => sheet.appendRow([emailId, item, c.category]));
+  });
+}
+
+// One-time backfill for Target orders/receipts that were already processed
+// (moved to .../Done) before the Order Items tab existed -- re-parses each
+// with Gemini and records item names without touching the Transactions
+// rows at all, which were already split correctly by the original run.
+// Safe to run more than once (appendOrderItems_ skips emails it has already
+// recorded). Run manually from the editor whenever needed, no trigger.
+function backfillTargetOrderItems() {
+  const doneLabel = getOrCreateLabel_(TARGET_LABEL_DONE);
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  doneLabel.getThreads().forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const text = `${message.getSubject()}\n\n${message.getPlainBody()}`.trim();
+      const orders = parseTargetOrderWithGemini_(text) || [];
+      orders.forEach((order) => appendOrderItems_(spreadsheet, message.getId(), order.categories));
+    } catch (err) {
+      Logger.log('Failed to backfill items for Target order thread "%s": %s', thread.getFirstMessageSubject(), err);
+    }
+  });
+}
+
+function backfillTargetReceiptItems() {
+  const doneLabel = getOrCreateLabel_(TARGET_RECEIPT_LABEL_DONE);
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  doneLabel.getThreads().forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+      if (!image) return;
+      const receipt = parseTargetReceiptWithGemini_(image);
+      if (receipt && receipt.categories) appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+    } catch (err) {
+      Logger.log('Failed to backfill items for Target receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
+    }
   });
 }
 
