@@ -22,6 +22,7 @@ const FIXED_BILLS_RANGE = 'Fixed Bills!A2:A';
 const FUN_MONEY_RANGE = 'Fun Money!A2:E';
 const MERCHANT_MEMORY_RANGE = 'Merchant Memory!A2:B';
 const MERCHANT_NAMES_RANGE = 'Merchant Names!A2:B';
+const ORDER_ITEMS_RANGE = 'Order Items!A2:C';
 
 // Sheets auto-detects date-shaped strings and stores them as its own date
 // type even when written via appendRow, not just manual entry — so with
@@ -150,6 +151,26 @@ export async function fetchFixedBills(accessToken, spreadsheetId = BUDGET_SPREAD
   try {
     const rows = await fetchRange_(accessToken, spreadsheetId, FIXED_BILLS_RANGE);
     return rows.map((row) => String(row[0] || '').toLowerCase().trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Item-level detail behind a Target order/receipt split (see the Order
+// Items tab created by setupBudgetSheets in the Apps Script) — keyed by
+// EmailId so a transaction's Details view can look up every item from the
+// same source email regardless of which of the split category rows it was
+// opened from. Fails soft to empty like the other reference tabs: the tab
+// may not exist yet, and Amazon/statement-import transactions never have
+// entries here at all, since neither pipeline gets real per-item names from
+// Gemini (Amazon only sees item counts per category; statements only see
+// merchant + amount).
+export async function fetchOrderItems(accessToken, spreadsheetId = BUDGET_SPREADSHEET_ID) {
+  try {
+    const rows = await fetchRange_(accessToken, spreadsheetId, ORDER_ITEMS_RANGE);
+    return rows
+      .map((row) => ({ emailId: row[0] || '', item: row[1] || '', category: row[2] || '' }))
+      .filter((r) => r.emailId && r.item);
   } catch {
     return [];
   }

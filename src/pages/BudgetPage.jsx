@@ -12,6 +12,16 @@ function formatCategoryLabel(category) {
   return category.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+// Groups a flat item list (all items from one source email, possibly spread
+// across several category rows) back into per-category buckets for display.
+function groupItemsByCategory(items) {
+  const map = {};
+  items.forEach(({ item, category }) => {
+    (map[category] ||= []).push(item);
+  });
+  return Object.entries(map);
+}
+
 function formatMonthLabel(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
@@ -39,7 +49,7 @@ export default function BudgetPage() {
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, recategorizeTransaction, renameMerchant, budgetActionError,
-    funMoneyEntries, funMoneyBalances,
+    funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   } = useApp();
   const [unlocked, setUnlocked] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
@@ -48,6 +58,7 @@ export default function BudgetPage() {
   const [pendingCategory, setPendingCategory] = useState(null); // { row, category }
   const [renamingRow, setRenamingRow] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [detailsRow, setDetailsRow] = useState(null);
 
   if (!isSignedIn) {
     return (
@@ -217,6 +228,12 @@ export default function BudgetPage() {
             const isRenaming = renamingRow === t.row;
             const isPendingScope = pendingCategory?.row === t.row;
             const isEditingCategory = editingRow === t.row && !isPendingScope;
+            // Only Target order/receipt splits ever have entries here — Amazon
+            // itemization and statement import never get real per-item names
+            // from Gemini, so those transactions just have no Details control.
+            const items = orderItemsByEmailId[t.emailId];
+            const hasDetails = !!items?.length;
+            const showingDetails = detailsRow === t.row;
 
             const startRename = (e) => {
               e.stopPropagation();
@@ -293,7 +310,25 @@ export default function BudgetPage() {
                     ) : (
                       <span className="task-tag tag-family">{formatCategoryLabel(t.category)}</span>
                     )}
+                    {hasDetails && (
+                      <span
+                        className="task-due"
+                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                        onClick={(e) => { e.stopPropagation(); setDetailsRow(showingDetails ? null : t.row); }}
+                      >
+                        {showingDetails ? 'Hide details' : 'Details'}
+                      </span>
+                    )}
                   </div>
+                  {hasDetails && showingDetails && (
+                    <div style={{ fontSize: '0.78em', color: 'var(--text-muted)', marginTop: '0.4em' }} onClick={(e) => e.stopPropagation()}>
+                      {groupItemsByCategory(items).map(([category, names]) => (
+                        <div key={category}>
+                          <strong>{formatCategoryLabel(category)}:</strong> {names.join(', ')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)' }}>
                   {formatCurrency(t.amount)}

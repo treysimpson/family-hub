@@ -89,6 +89,13 @@ a "Family Agent" label, which is what this script actually polls.
       this script to replace cryptic raw merchant text (e.g. "SONDERMIND
       INC") with a readable name (e.g. "Beryl's Therapy") on every future
       transaction from that same raw text.
+    - **Order Items** — empty, EmailId/Item/Category columns. Written by
+      `processTargetOrderEmails`/`processTargetReceiptImports` whenever a
+      Target order or receipt is genuinely itemized, so the real item names
+      Gemini already extracted aren't thrown away — the Budget page's
+      "Details" control on a transaction reads this to show what was
+      actually bought. Never written by Amazon itemization or statement
+      import, since neither gets real item names from Gemini.
 13. **Add the monthly allowance trigger**: Triggers page → Add Trigger →
     function `addMonthlyFunMoneyAllowance` → Time-driven → Month timer → day
     **1** → whatever time window you prefer → Save. This deposits $250 into
@@ -297,6 +304,12 @@ the Transactions tab for new rows tagged "Target receipt import" in Notes,
 one per category, summing to the purchase total. If a card-alert row for
 that same date/amount already existed, it should be gone (replaced by the
 split); if not, the split rows are simply new additions.
+
+For item detail: after either of the two Target flows above completes
+successfully, check the Order Items tab for new rows — one per item, keyed
+by EmailId. On the Budget page, that transaction (or any of the split rows
+from the same order) should show a "Details" link; tapping it should
+expand to the item names grouped by category, no prices.
 
 For statement import: after labeling a statement email "Statement Import"
 and running `processStatementImports` (or waiting for its trigger), check

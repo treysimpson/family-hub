@@ -123,6 +123,21 @@ const MERCHANT_MEMORY_TAB = 'Merchant Memory';
 // Transactions sheet) — avoid renaming that one.
 const MERCHANT_NAMES_TAB = 'Merchant Names';
 
+// ---- Order item detail (T-11 Phase E) ----
+// Whenever a Target order or receipt is genuinely itemized (real per-item
+// names, not just a category guess), Gemini already sees the actual item
+// names -- this captures them instead of throwing them away once the
+// category subtotal is computed, so the Hub app can show a "Details" view
+// on that transaction. Keyed on EmailId (not order number), which works
+// uniformly for both Target order confirmations and in-store receipt
+// imports (receipts have no order number). Amazon itemization and
+// statement import never write here, since neither pipeline gets real
+// per-item names from Gemini (Amazon only gives item counts per category;
+// statements only give merchant + amount). Read by the Hub app
+// (src/lib/googleSheets.js fetchOrderItems) -- never read back by this
+// script.
+const ORDER_ITEMS_TAB = 'Order Items';
+
 function processFamilyAgentEmails() {
   const inboxLabel = getOrCreateLabel_(LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -321,6 +336,12 @@ function processTargetOrderEmails() {
       // every order in a multi-order email must be attempted regardless of
       // whether an earlier one matched.
       const results = orders.map((order) => applyTargetOrder_(sheet, order));
+      // Only record item detail for orders that actually matched this run --
+      // an unmatched order retries on the next run with a fresh Gemini parse,
+      // so recording items here too would duplicate them once it does match.
+      orders.forEach((order, i) => {
+        if (results[i]) appendOrderItems_(spreadsheet, message.getId(), order.categories);
+      });
       const allMatched = results.every(Boolean);
       if (allMatched) {
         moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_LABEL_DONE));
@@ -417,6 +438,7 @@ function processTargetReceiptImports() {
           );
         });
       }
+      appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
 
       moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_DONE));
     } catch (err) {
@@ -716,8 +738,9 @@ const TARGET_ORDER_SCHEMA = {
           properties: {
             category: { type: 'STRING', enum: ITEMIZED_CATEGORIES },
             subtotal: { type: 'NUMBER', description: 'Pre-tax subtotal of the items placed in this category' },
+            items: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Plain item names placed in this category, no prices' },
           },
-          required: ['category', 'subtotal'],
+          required: ['category', 'subtotal', 'items'],
         },
       },
     },
@@ -762,7 +785,7 @@ function buildTargetOrderPrompt_(text) {
     'For each order:',
     '- "orderNumber" is the Target order number exactly as shown.',
     '- "total" is the actual amount charged, including tax and any shipping, as a plain number.',
-    '- "categories" breaks down the items in the order, before tax and shipping, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax or shipping in any category subtotal -- the gap between the sum of your subtotals and the order total will be treated separately as tax and shipping.',
+    '- "categories" breaks down the items in the order, before tax and shipping, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax or shipping in any category subtotal -- the gap between the sum of your subtotals and the order total will be treated separately as tax and shipping. "items" is a plain list of the item names placed in that category, exactly as shown in the order, with no prices included.',
     '',
     'Email:',
     '"""',
@@ -785,8 +808,9 @@ const TARGET_RECEIPT_SCHEMA = {
         properties: {
           category: { type: 'STRING', enum: ITEMIZED_CATEGORIES },
           subtotal: { type: 'NUMBER', description: 'Pre-tax subtotal of the items placed in this category' },
+          items: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Plain item names placed in this category, no prices' },
         },
-        required: ['category', 'subtotal'],
+        required: ['category', 'subtotal', 'items'],
       },
     },
   },
@@ -839,7 +863,7 @@ function buildTargetReceiptPrompt_() {
     'Rules:',
     '- "date" is the purchase date in YYYY-MM-DD format.',
     '- "total" is the actual amount charged, including tax, as a plain number.',
-    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax.',
+    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt, with no prices included.',
   ].join('\n');
 }
 
@@ -961,10 +985,32 @@ function lookupMerchantName_(spreadsheet, merchant) {
   return null;
 }
 
+function getOrCreateOrderItemsSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(ORDER_ITEMS_TAB);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet();
+    sheet.setName(ORDER_ITEMS_TAB);
+    sheet.appendRow(['EmailId', 'Item', 'Category']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// One row per item across every category in the order/receipt, so a
+// transaction's Details view (looked up by EmailId in the Hub app) shows
+// the full item list regardless of which of the split Transactions rows it
+// was opened from.
+function appendOrderItems_(spreadsheet, emailId, categories) {
+  const sheet = getOrCreateOrderItemsSheet_(spreadsheet);
+  categories.forEach((c) => {
+    (c.items || []).forEach((item) => sheet.appendRow([emailId, item, c.category]));
+  });
+}
+
 // Run manually once from the Apps Script editor (function dropdown ->
 // setupBudgetSheets -> Run) to create the Budget Targets, Fixed Bills, Fun
-// Money, Merchant Memory, and Merchant Names tabs ahead of time, so they
-// are ready without waiting for the next email.
+// Money, Merchant Memory, Merchant Names, and Order Items tabs ahead of
+// time, so they are ready without waiting for the next email.
 function setupBudgetSheets() {
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   getOrCreateTransactionsSheet_(spreadsheet);
@@ -973,6 +1019,7 @@ function setupBudgetSheets() {
   getOrCreateFunMoneySheet_(spreadsheet);
   getOrCreateMerchantMemorySheet_(spreadsheet);
   getOrCreateMerchantNamesSheet_(spreadsheet);
+  getOrCreateOrderItemsSheet_(spreadsheet);
   Logger.log('Budget sheets ready: ' + spreadsheet.getUrl());
 }
 

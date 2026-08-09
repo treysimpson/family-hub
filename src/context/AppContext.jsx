@@ -8,7 +8,7 @@ import {
   insertTask, setTaskStatus, deleteTask, clearCompletedTasks, pruneStaleCompleted,
 } from '../lib/googleTasks';
 import {
-  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchFunMoney,
+  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchFunMoney, fetchOrderItems,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
 } from '../lib/googleSheets';
 import { useAuth } from './AuthContext';
@@ -72,6 +72,7 @@ export function AppProvider({ children }) {
   // ledger-style running balance, not a monthly total.
   const [selectedBudgetMonth, setSelectedBudgetMonth] = useState(currentMonthKey);
   const [funMoneyEntries, setFunMoneyEntries] = useState([]);
+  const [orderItems, setOrderItems] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +150,7 @@ export function AppProvider({ children }) {
       fetchBudgetTargets(accessToken).then((data) => { if (!cancelled) setBudgetTargets(data); });
       fetchFixedBills(accessToken).then((data) => { if (!cancelled) setFixedBillMerchants(data); });
       fetchFunMoney(accessToken).then((data) => { if (!cancelled) setFunMoneyEntries(data); });
+      fetchOrderItems(accessToken).then((data) => { if (!cancelled) setOrderItems(data); });
     };
     load();
     const id = setInterval(load, BUDGET_REFRESH_MS);
@@ -350,6 +352,18 @@ export function AppProvider({ children }) {
     return balances;
   }, [funMoneyEntries]);
 
+  // Groups item-detail rows by EmailId so a transaction's Details view (only
+  // ever shown for Target order/receipt splits — see fetchOrderItems) can
+  // look up the full item list in O(1) regardless of which split row it was
+  // opened from.
+  const orderItemsByEmailId = useMemo(() => {
+    const map = {};
+    orderItems.forEach((r) => {
+      (map[r.emailId] ||= []).push({ item: r.item, category: r.category });
+    });
+    return map;
+  }, [orderItems]);
+
   const setTheme = useCallback((t) => {
     setThemeState(t);
     localStorage.setItem('fh-theme', t);
@@ -408,7 +422,7 @@ export function AppProvider({ children }) {
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, recategorizeTransaction, renameMerchant, budgetActionError,
-    funMoneyEntries, funMoneyBalances,
+    funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
