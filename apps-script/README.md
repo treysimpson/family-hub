@@ -188,12 +188,29 @@ per-item prices:
   these automatically (unlike online orders) — the itemized detail only
   shows up in the Target app's Purchase History (90-day window). So this is
   a manual step: screenshot that itemized purchase-detail screen (or photo
-  a paper receipt) and email the image to yourself. Gemini has native image
+  a paper receipt) and email the image in. Gemini has native image
   understanding, the same capability `processStatementImports` already uses
   for PDFs, so no OCR step is needed. If a matching Transactions row already
   exists (the bank's card alert got there first), it gets replaced with the
   itemized split, same as the online-order path; if not, the split is
   appended as new rows directly, same as how statement import fills a gap.
+
+**Getting a receipt screenshot labeled** (added 2026-08-09): email it to
+**simpsonfamilyhubapp@gmail.com**, the same shared address everything else
+in the app uses — not yourself. `processFamilyAgentEmails` now checks any
+image attachment on a Family Agent email with a cheap Gemini classification
+pass (`routeReceiptImage_`/`classifyReceiptImageWithGemini_`) before trying
+to parse it as a task/event/grocery request: if it recognizes a Target
+receipt, the thread gets moved straight to the `Target Receipt` label with
+no manual labeling needed, and it works for Beryl too, not just whoever
+owns this script (self-addressing a screenshot only ever worked for Trey).
+A Costco receipt is recognized as well and parked under its own `Costco
+Receipt` label, ready for whenever a `processCostcoReceiptImports` gets
+built — nothing processes that label yet. Anything else (a genuinely
+unclear receipt, or an image that is not a receipt at all) falls through to
+`Family Agent/Needs Review` or the normal task/event parse as before.
+Manually applying the `Target Receipt` label directly still works too, if
+you'd rather not rely on the classification step.
 
 20. **Gmail filter for Target.com order confirmations**: Settings → Filters
     → Create a new filter → "From" = Target's order-confirmation sender
@@ -205,13 +222,10 @@ per-item prices:
 21. **Add a trigger**: Triggers page → Add Trigger → function
     `processTargetOrderEmails` → Time-driven → Minutes timer → Every 5
     minutes → Save.
-22. **No filter for in-store receipts** — same as statement import, this is
-    a manual/infrequent action, not a recurring sender. To import one: open
-    the Target app → Account → Purchase history → the in-store purchase →
-    screenshot the itemized detail screen, then email that screenshot to
-    yourself and apply the label `Target Receipt`.
-23. **Add a trigger** (optional — can also just run manually right after
-    emailing a screenshot): Triggers page → Add Trigger → function
+22. **No filter or label needed for in-store receipts** — email the
+    screenshot to simpsonfamilyhubapp@gmail.com like any other family
+    request (see above); `processFamilyAgentEmails` handles the routing.
+23. **Add a trigger**: Triggers page → Add Trigger → function
     `processTargetReceiptImports` → Time-driven → Minutes timer → Every 5
     minutes → Save.
 
@@ -297,13 +311,19 @@ itemized" in Notes, and those new rows should sum to the same total as the
 original single row. Same retry behavior as Amazon: if the card alert has
 not landed yet, the thread stays labeled and retries on the next run.
 
-For Target receipt import: after emailing a screenshot of an itemized
-in-store purchase with the label "Target Receipt" applied, run
+For Target receipt import: email a screenshot of an itemized in-store
+purchase to simpsonfamilyhubapp@gmail.com (no label needed), run
+`processFamilyAgentEmails` manually (or wait for its trigger), and check
+that the thread moved to the "Target Receipt" label — that confirms
+`routeReceiptImage_` recognized it as a Target receipt. Then run
 `processTargetReceiptImports` manually (or wait for its trigger) and check
 the Transactions tab for new rows tagged "Target receipt import" in Notes,
 one per category, summing to the purchase total. If a card-alert row for
 that same date/amount already existed, it should be gone (replaced by the
-split); if not, the split rows are simply new additions.
+split); if not, the split rows are simply new additions. To sanity-check
+the classification step itself, try a non-receipt photo — it should fall
+through to "Family Agent/Needs Review" (or the normal task/event parse, if
+Gemini decides it is not a receipt) rather than getting stuck anywhere.
 
 For item detail: after either of the two Target flows above completes
 successfully, check the Order Items tab for new rows — one per item, keyed

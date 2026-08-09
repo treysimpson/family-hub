@@ -82,12 +82,24 @@ const TARGET_LABEL_REVIEW = 'Target Orders/Needs Review';
 // In-store purchases scanned with the Target Circle wallet are not emailed
 // automatically -- there is no forwarding pipeline possible here. Instead,
 // a screenshot of the itemized purchase-detail screen in the Target app
-// (or a photo of a paper receipt) is emailed in manually and parsed the
-// same way processStatementImports parses a PDF: Gemini image/document
-// understanding directly on the inline attachment, no OCR step needed.
+// (or a photo of a paper receipt) is emailed to simpsonfamilyhubapp@gmail.com
+// like any other family request and parsed the same way processStatementImports
+// parses a PDF: Gemini image/document understanding directly on the inline
+// attachment, no OCR step needed. routeReceiptImage_ (called from
+// processFamilyAgentEmails) is what actually gets it labeled here -- no
+// manual labeling needed, and since it goes through the shared intake
+// address, Beryl can send one too, not just whoever owns this script.
 const TARGET_RECEIPT_LABEL_INBOX = 'Target Receipt';
 const TARGET_RECEIPT_LABEL_DONE = 'Target Receipt/Done';
 const TARGET_RECEIPT_LABEL_REVIEW = 'Target Receipt/Needs Review';
+
+// ---- Costco in-store receipt (recognized, not yet processed) ----
+// routeReceiptImage_ can already tell a Costco receipt apart from a Target
+// one, so it gets parked under its own label now -- a future
+// processCostcoReceiptImports (mirroring processTargetReceiptImports) would
+// have a ready-made backlog to work through instead of starting from zero.
+// Nothing currently moves threads out of this label.
+const COSTCO_RECEIPT_LABEL_INBOX = 'Costco Receipt';
 
 // ---- Statement import / reconciliation (T-11 Phase E) ----
 // Manual, infrequent (monthly), so no forwarding complexity like Amazon
@@ -146,6 +158,15 @@ function processFamilyAgentEmails() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
+
+      // A receipt screenshot comes through this same shared intake address
+      // rather than a self-addressed email, so anyone in the family can
+      // send one. Route it to the right store-specific label instead of
+      // running it through the task/event/grocery parser below, which
+      // would just fail on it.
+      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+      if (image && routeReceiptImage_(thread, inboxLabel, image)) return;
+
       const text = `${message.getSubject()}\n\n${message.getPlainBody()}`.trim();
       const results = parseWithGemini_(text); // array — one entry per requested item
 
@@ -165,6 +186,32 @@ function processFamilyAgentEmails() {
       moveThread_(thread, inboxLabel, getOrCreateLabel_(LABEL_REVIEW));
     }
   });
+}
+
+// Classifies an image attachment and, if it is a recognized store receipt,
+// moves the thread straight to that store's own label so its dedicated
+// pipeline (processTargetReceiptImports for Target) picks it up on its next
+// run. Returns true if it handled (moved) the thread -- the caller should
+// skip the normal task/event/grocery parse in that case. Returns false for
+// "not a recognized receipt," so the caller falls through to the normal
+// parse as usual (e.g. a photo attached to an ordinary to-do request).
+function routeReceiptImage_(thread, inboxLabel, image) {
+  const classification = classifyReceiptImageWithGemini_(image);
+  if (!classification || !classification.isReceipt) return false;
+
+  if (classification.store === 'target') {
+    moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_INBOX));
+    return true;
+  }
+  if (classification.store === 'costco') {
+    moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_INBOX));
+    return true;
+  }
+  // A receipt from an unrecognized/unsupported store -- flag for review
+  // rather than wasting a second Gemini call on the task/event parser,
+  // which would just fail on an email that is really just a photo.
+  moveThread_(thread, inboxLabel, getOrCreateLabel_(LABEL_REVIEW));
+  return true;
 }
 
 function isActionable_(result) {
@@ -799,6 +846,63 @@ function buildTargetOrderPrompt_(text) {
     text,
     '"""',
   ].join('\n');
+}
+
+// ---- Gemini: receipt image classification ----
+// A cheap first pass on any image attachment routeReceiptImage_ finds on a
+// Family Agent email -- separate from the detailed per-item extraction in
+// parseTargetReceiptWithGemini_ below, since that prompt is Target-specific
+// and would be the wrong tool for "is this even a receipt, and if so from
+// where."
+
+const RECEIPT_CLASSIFY_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    isReceipt: { type: 'BOOLEAN', description: 'True if the image is a purchase receipt, order confirmation, or itemized purchase-history screenshot' },
+    store: { type: 'STRING', enum: ['target', 'costco', 'other'], nullable: true, description: 'Which store the receipt is from, based on logos, headers, or formatting -- "other" if it is a receipt but not clearly one of the named stores' },
+  },
+  required: ['isReceipt'],
+};
+
+function classifyReceiptImageWithGemini_(imageBlob) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY script property is not set');
+
+  const base64 = Utilities.base64Encode(imageBlob.getBytes());
+  const mimeType = imageBlob.getContentType();
+  const prompt = [
+    'You are given an image attached to a family household email. Determine whether this image is a purchase receipt, order confirmation, or itemized purchase-history screenshot, as opposed to some other kind of photo entirely (for example a family photo, a school flyer, or a screenshot unrelated to shopping).',
+    '',
+    'If it is a receipt of that kind, also identify which store it is from based on logos, headers, or formatting.',
+  ].join('\n');
+
+  const response = UrlFetchApp.fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RECEIPT_CLASSIFY_SCHEMA,
+        },
+      }),
+    }
+  );
+
+  const raw = response.getContentText();
+  const body = JSON.parse(raw);
+  if (body.error) throw new Error('Gemini API error: ' + body.error.message);
+  const jsonText = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text;
+  if (!jsonText) throw new Error('Gemini returned no candidates: ' + raw);
+  return JSON.parse(jsonText);
 }
 
 // ---- Gemini: Target receipt parsing ----
