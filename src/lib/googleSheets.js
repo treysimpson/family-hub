@@ -11,7 +11,7 @@ export const BUDGET_SPREADSHEET_ID = '1e_W-BPgI9OIHKNJsxCnfqGvltpNAKuCFiUOFqhyU8
 // Must match TRANSACTION_CATEGORIES in apps-script/family-agent.gs.
 export const TRANSACTION_CATEGORIES = [
   'groceries', 'dining', 'gas-auto', 'travel', 'household', 'entertainment',
-  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities',
+  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions',
   'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'other',
 ];
 

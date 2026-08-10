@@ -162,29 +162,60 @@ export function AppProvider({ children }) {
     return () => { cancelled = true; clearInterval(id); };
   }, [isSignedIn, accessToken]);
 
-  // Updates the transaction's category, and — unless remember is false —
-  // saves it as a standing rule for future transactions from this merchant
-  // (apps-script/family-agent.gs consults it; this just writes the sheet,
-  // the agent does the reading). remember should be false for merchants
-  // known to span multiple categories (e.g. Target: groceries one trip,
-  // clothes another) where a blanket rule would be wrong most of the time —
-  // see BudgetPage's "just this once" vs "always" prompt. Optimistic local
-  // update, rolled back on failure so the UI never shows a category that
-  // was not actually saved (e.g. if the write scope has not been granted
-  // yet — the read-only -> read/write OAuth upgrade is a separate manual
-  // Cloud Console step).
+  // Updates the transaction's category. When remember is true ("Always"),
+  // this also applies to every other existing transaction sharing this raw
+  // merchant text (not just the one tapped — same reasoning as
+  // renameMerchant below: "always categorize Netflix as subscriptions"
+  // should fix the past occurrences too, not just future ones) and saves
+  // the category as a standing rule for future transactions from this
+  // merchant (apps-script/family-agent.gs consults it; this just writes the
+  // sheet, the agent does the reading). remember should be false for
+  // merchants known to span multiple categories (e.g. Target: groceries one
+  // trip, clothes another) where a blanket rule would be wrong most of the
+  // time — see BudgetPage's "just this once" vs "always" prompt, which also
+  // skips the retroactive multi-row update for the same reason. Optimistic
+  // local update, rolled back (only for rows whose write actually failed)
+  // on failure so the UI never shows a category that was not actually saved
+  // (e.g. if the write scope has not been granted yet — the read-only ->
+  // read/write OAuth upgrade is a separate manual Cloud Console step).
   const recategorizeTransaction = useCallback(async (transaction, category, remember = true) => {
     const previousCategory = transaction.category;
-    setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category } : t)));
-    try {
-      await updateTransactionCategory(accessToken, transaction.row, category);
-    } catch (err) {
-      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category: previousCategory } : t)));
-      setBudgetActionError(err.message);
+    if (!remember) {
+      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category } : t)));
+      try {
+        await updateTransactionCategory(accessToken, transaction.row, category);
+      } catch (err) {
+        setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, category: previousCategory } : t)));
+        setBudgetActionError(err.message);
+        return;
+      }
+      setBudgetActionError(null);
       return;
     }
-    setBudgetActionError(null);
-    if (!remember) return;
+
+    const normalizedMerchant = transaction.merchant.toLowerCase().trim();
+    const matches = budgetTransactions.filter((t) => t.merchant.toLowerCase().trim() === normalizedMerchant);
+    const previousCategories = new Map(matches.map((t) => [t.row, t.category]));
+
+    setBudgetTransactions((prev) => prev.map((t) => (
+      previousCategories.has(t.row) ? { ...t, category } : t
+    )));
+
+    const results = await Promise.allSettled(
+      matches.map((t) => updateTransactionCategory(accessToken, t.row, category)),
+    );
+    const failedRows = new Set(
+      results.map((r, i) => (r.status === 'rejected' ? matches[i].row : null)).filter((row) => row !== null),
+    );
+    if (failedRows.size) {
+      setBudgetTransactions((prev) => prev.map((t) => (
+        failedRows.has(t.row) ? { ...t, category: previousCategories.get(t.row) } : t
+      )));
+      setBudgetActionError(`Could not recategorize ${failedRows.size} of ${matches.length} matching transactions`);
+    } else {
+      setBudgetActionError(null);
+    }
+
     // Best-effort: the category update above is the part the user actually
     // sees and cares about, so a memory-write failure (e.g. the Merchant
     // Memory tab doesn't exist yet because setupBudgetSheets hasn't been run)
@@ -194,7 +225,7 @@ export function AppProvider({ children }) {
     } catch (err) {
       console.error('Failed to save merchant memory:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, budgetTransactions]);
 
   // Renames every existing transaction sharing this raw merchant text (not
   // just the one tapped), and remembers the mapping so future transactions

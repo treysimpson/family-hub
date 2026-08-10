@@ -39,7 +39,7 @@ const FIXED_BILLS_TAB = 'Fixed Bills';
 // genuinely unclear. The rest are Trey's actual household categories.
 const TRANSACTION_CATEGORIES = [
   'groceries', 'dining', 'gas-auto', 'travel', 'household', 'entertainment',
-  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities',
+  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions',
   'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'other',
 ];
 const EXCLUDED_FROM_BUDGET = ['one-time', 'trey-work'];
@@ -706,12 +706,13 @@ function buildStatementPrompt_() {
     '  7. "dining": restaurants, takeout, coffee shops.',
     '  8. "gas-auto": gas station fuel, car repair/maintenance, auto parts, DMV.',
     '  9. "travel": flights, hotels, rental cars, vacation-related.',
-    '  10. "bills-utilities": recurring utility or service bills -- electric, water, internet, phone, insurance, subscriptions billed regularly.',
-    '  11. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
-    '  12. "entertainment": movies, streaming, concerts, hobbies, other fun purchases.',
-    '  13. "healthcare": medical, dental, pharmacy.',
-    '  14. "shopping": general retail that does not clearly fit any category above.',
-    '  15. "other": genuinely unclear.',
+    '  10. "bills-utilities": recurring bills required to keep the household running -- electric, water, gas, internet, phone, insurance, mortgage/rent.',
+    '  11. "subscriptions": recurring but optional subscription/membership charges -- streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
+    '  12. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
+    '  13. "entertainment": one-off fun purchases -- movie tickets, concerts, hobbies -- not recurring subscriptions, which go under "subscriptions" above.',
+    '  14. "healthcare": medical, dental, pharmacy.',
+    '  15. "shopping": general retail that does not clearly fit any category above.',
+    '  16. "other": genuinely unclear.',
   ].join('\n');
 }
 
@@ -1249,12 +1250,13 @@ function buildTransactionPrompt_(text) {
     '  7. "dining": restaurants, takeout, coffee shops.',
     '  8. "gas-auto": gas station fuel, car repair/maintenance, auto parts, DMV.',
     '  9. "travel": flights, hotels, rental cars, vacation-related.',
-    '  10. "bills-utilities": recurring utility or service bills — electric, water, internet, phone, insurance, subscriptions billed regularly.',
-    '  11. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
-    '  12. "entertainment": movies, streaming, concerts, hobbies, other fun purchases.',
-    '  13. "healthcare": medical, dental, pharmacy.',
-    '  14. "shopping": general retail that does not clearly fit any category above.',
-    '  15. "other": genuinely unclear.',
+    '  10. "bills-utilities": recurring bills required to keep the household running — electric, water, gas, internet, phone, insurance, mortgage/rent.',
+    '  11. "subscriptions": recurring but optional subscription/membership charges — streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
+    '  12. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
+    '  13. "entertainment": one-off fun purchases — movie tickets, concerts, hobbies — not recurring subscriptions, which go under "subscriptions" above.',
+    '  14. "healthcare": medical, dental, pharmacy.',
+    '  15. "shopping": general retail that does not clearly fit any category above.',
+    '  16. "other": genuinely unclear.',
     '- "notes" can capture anything else potentially useful, or omit if nothing extra applies.',
     '',
     'Email:',
