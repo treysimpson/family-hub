@@ -71,6 +71,11 @@ export function AppProvider({ children }) {
   // now is" window. Fun Money is intentionally not scoped to this; it's a
   // ledger-style running balance, not a monthly total.
   const [selectedBudgetMonth, setSelectedBudgetMonth] = useState(currentMonthKey);
+  // Full calendar year for the year-to-date/annual rollup view — separate
+  // from selectedBudgetMonth since the two views can be browsed
+  // independently (e.g. looking at this month while reviewing last year's
+  // annual totals).
+  const [selectedBudgetYear, setSelectedBudgetYear] = useState(() => new Date().getFullYear());
   const [funMoneyEntries, setFunMoneyEntries] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
 
@@ -341,6 +346,28 @@ export function AppProvider({ children }) {
 
   const budgetDiscretionaryTotal = budgetMonthTotal === null ? null : budgetMonthTotal - budgetFixedTotal;
 
+  // Year-to-date/annual rollup — same category-exclusion rule as the
+  // monthly totals above, just over a full calendar year instead of a
+  // month. Useful once a full year of statement history exists (backfilled
+  // via processStatementImports) for actually setting next year's targets.
+  const selectedYearTransactions = useMemo(() => {
+    if (!budgetTransactions) return [];
+    return budgetTransactions.filter((t) => t.date.startsWith(String(selectedBudgetYear)));
+  }, [budgetTransactions, selectedBudgetYear]);
+
+  const yearCategoryTotals = useMemo(() => {
+    const totals = {};
+    selectedYearTransactions
+      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category))
+      .forEach((t) => { totals[t.category] = (totals[t.category] || 0) + t.amount; });
+    return totals;
+  }, [selectedYearTransactions]);
+
+  const yearTotal = useMemo(
+    () => Object.values(yearCategoryTotals).reduce((sum, v) => sum + v, 0),
+    [yearCategoryTotals],
+  );
+
   // Ledger-style balance: sum of every allowance/spend row ever for that
   // person, so unspent money automatically carries into next month without
   // any month-boundary logic — see fetchFunMoney in googleSheets.js.
@@ -420,8 +447,9 @@ export function AppProvider({ children }) {
     toggleTaskLive, addTaskLive, deleteTaskLive, clearCheckedLive, refetchTasks,
     budgetLive, budgetTransactions, budgetMonthTotal, budgetError,
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
+    selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
-    budgetFixedTotal, budgetDiscretionaryTotal, recategorizeTransaction, renameMerchant, budgetActionError,
+    budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
     funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   };
 
