@@ -93,13 +93,19 @@ const TARGET_RECEIPT_LABEL_INBOX = 'Target Receipt';
 const TARGET_RECEIPT_LABEL_DONE = 'Target Receipt/Done';
 const TARGET_RECEIPT_LABEL_REVIEW = 'Target Receipt/Needs Review';
 
-// ---- Costco in-store receipt (recognized, not yet processed) ----
-// routeReceiptImage_ can already tell a Costco receipt apart from a Target
-// one, so it gets parked under its own label now -- a future
-// processCostcoReceiptImports (mirroring processTargetReceiptImports) would
-// have a ready-made backlog to work through instead of starting from zero.
-// Nothing currently moves threads out of this label.
+// ---- Costco in-store receipt (T-11 Phase E) ----
+// Costco has no order-confirmation emails at all (unlike Target.com) and no
+// per-item API/export, so like Target's in-store path this is entirely a
+// manual screenshot/photo of the paper receipt, routed the same way via
+// routeReceiptImage_/classifyReceiptImageWithGemini_. Mirrors
+// processTargetReceiptImports exactly (see comment there) -- the only real
+// difference is the parsing prompt, since Costco receipts show terse
+// abbreviated item names and number codes rather than a department-labeled
+// purchase-history screen, so mapping a line to a category leans more on
+// Gemini's general knowledge of what a cryptic Costco item name usually is.
 const COSTCO_RECEIPT_LABEL_INBOX = 'Costco Receipt';
+const COSTCO_RECEIPT_LABEL_DONE = 'Costco Receipt/Done';
+const COSTCO_RECEIPT_LABEL_REVIEW = 'Costco Receipt/Needs Review';
 
 // ---- Statement import / reconciliation (T-11 Phase E) ----
 // Manual, infrequent (monthly), so no forwarding complexity like Amazon
@@ -495,6 +501,59 @@ function processTargetReceiptImports() {
     } catch (err) {
       Logger.log('Failed to process Target receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_REVIEW));
+    }
+  });
+}
+
+// Mirrors processTargetReceiptImports exactly -- see its comment and the
+// "Costco in-store receipt" comment above for why this is entirely a manual
+// screenshot/photo path with no order-email pipeline. Kept as a separate
+// function (rather than parameterizing one shared function over "Target" vs
+// "Costco") since a future divergence -- e.g. Costco starting to email
+// digital receipts -- would only need one of the two touched.
+function processCostcoReceiptImports() {
+  const inboxLabel = getOrCreateLabel_(COSTCO_RECEIPT_LABEL_INBOX);
+  const threads = inboxLabel.getThreads();
+  if (!threads.length) return;
+
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+
+  threads.forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+
+      if (!image) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
+        return;
+      }
+
+      const receipt = parseCostcoReceiptWithGemini_(image);
+      if (!receipt || !receipt.categories || !receipt.categories.length) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
+        return;
+      }
+
+      const existingRow = findTransactionRow_(sheet, receipt.date, receipt.total);
+      if (existingRow !== -1) {
+        splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, 'Costco receipt import', message.getId());
+      } else {
+        computeCategorySplit_(receipt.categories, receipt.total).forEach((c) => {
+          appendTransactionRow_(
+            sheet,
+            { date: receipt.date, card: '', merchant: 'Costco', amount: c.amount, category: c.category, notes: 'Costco receipt import' },
+            message.getId()
+          );
+        });
+      }
+      appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_DONE));
+    } catch (err) {
+      Logger.log('Failed to process Costco receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
     }
   });
 }
@@ -979,6 +1038,61 @@ function buildTargetReceiptPrompt_() {
   ].join('\n');
 }
 
+// ---- Gemini: Costco receipt parsing ----
+// Same schema/shape as the Target receipt parse above -- only the prompt
+// differs, since Costco's paper receipt format needs different guidance.
+
+const COSTCO_RECEIPT_SCHEMA = TARGET_RECEIPT_SCHEMA;
+
+// Sends the photo directly to Gemini as inline image data, same as
+// parseTargetReceiptWithGemini_.
+function parseCostcoReceiptWithGemini_(imageBlob) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY script property is not set');
+
+  const base64 = Utilities.base64Encode(imageBlob.getBytes());
+  const mimeType = imageBlob.getContentType();
+
+  const response = UrlFetchApp.fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: buildCostcoReceiptPrompt_() },
+            { inline_data: { mime_type: mimeType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: COSTCO_RECEIPT_SCHEMA,
+        },
+      }),
+    }
+  );
+
+  const raw = response.getContentText();
+  const body = JSON.parse(raw);
+  if (body.error) throw new Error('Gemini API error: ' + body.error.message);
+  const jsonText = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text;
+  if (!jsonText) throw new Error('Gemini returned no candidates: ' + raw);
+  return JSON.parse(jsonText);
+}
+
+function buildCostcoReceiptPrompt_() {
+  return [
+    'You are given a photo of a paper Costco warehouse receipt. Extract the purchase as JSON.',
+    '',
+    'Costco receipts print terse abbreviated item names and a numeric item code, not a department header the way a Target receipt does (e.g. "ORG SPINACH", "KS BATH TISSU", "ROTISS CHKN") -- there is also no separate tax line for most grocery items (food is generally untaxed), but non-food items usually do have tax, and an "E" printed after a line\'s price marks it as exempt from tax, everything else is generally taxable. Use general knowledge of what a cryptic Costco item name usually refers to (e.g. "KS" prefix means Kirkland Signature, Costco\'s store brand, not a category by itself -- categorize by what the product actually is) to decide its category. A membership renewal charge, if present as its own line, is "bills-utilities". Gas station fuel purchases (separate from the warehouse receipt, if included) are "gas-auto".',
+    '- "date" is the purchase date in YYYY-MM-DD format.',
+    '- "total" is the actual amount charged, including tax, as a plain number.',
+    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. For example: fresh food, pantry items, and beverages map to groceries; vitamins, medicine, and personal care map to healthcare; diapers, kids clothing, and toys map to kids-other; electronics, home goods, and cleaning supplies map to household; adult clothing map to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt (abbreviated is fine), with no prices included.',
+  ].join('\n');
+}
+
 // ---- Google Sheets ----
 
 function getOrCreateBudgetSpreadsheet_() {
@@ -1160,6 +1274,24 @@ function backfillTargetReceiptItems() {
       if (receipt && receipt.categories) appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
     } catch (err) {
       Logger.log('Failed to backfill items for Target receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
+    }
+  });
+}
+
+// Mirrors backfillTargetReceiptItems -- see its comment.
+function backfillCostcoReceiptItems() {
+  const doneLabel = getOrCreateLabel_(COSTCO_RECEIPT_LABEL_DONE);
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  doneLabel.getThreads().forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+      if (!image) return;
+      const receipt = parseCostcoReceiptWithGemini_(image);
+      if (receipt && receipt.categories) appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+    } catch (err) {
+      Logger.log('Failed to backfill items for Costco receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
     }
   });
 }

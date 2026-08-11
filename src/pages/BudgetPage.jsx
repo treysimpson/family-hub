@@ -5,6 +5,7 @@ import { TRANSACTION_CATEGORIES } from '../lib/googleSheets';
 import PinGate from '../components/PinGate';
 import CategoryTrendChart from '../components/CategoryTrendChart';
 import BudgetCharts from '../components/BudgetCharts';
+import HowToPanel from '../components/panels/HowToPanel';
 
 function formatCurrency(amount) {
   return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -47,6 +48,24 @@ function lastNMonthKeys(n, endMonthKey) {
   return months;
 }
 
+// Merchants that have a real itemization pipeline (Target/Costco receipt
+// import, Amazon order matching) — the only ones where "send in a receipt"
+// is actually an available fix, so the only ones worth flagging.
+const RECEIPT_ELIGIBLE_MERCHANTS = ['target', 'costco', 'amazon'];
+// Every itemization pipeline's apps-script/family-agent.gs tags its Notes
+// column with one of these substrings (appendTransactionRow_ call sites:
+// applyAmazonOrder_ writes "Order <n>", applyTargetOrder_ writes "Order
+// <n>; Target itemized", the receipt-import paths write "<Store> receipt
+// import"), so a row without any of them is still just the plain card-alert
+// guess — heuristic, not a real flag column, so a coincidental "order" in a
+// Gemini-extracted note on an unrelated purchase would false-negative here.
+const ITEMIZED_NOTES_MARKERS = ['order ', 'itemized', 'receipt import'];
+
+function isItemizedTransaction(t) {
+  const notes = (t.notes || '').toLowerCase();
+  return ITEMIZED_NOTES_MARKERS.some((marker) => notes.includes(marker));
+}
+
 // Flat $25 warning line rather than a percentage — both pools are $250/mo
 // today, so this is ~10%; revisit if the monthly amounts ever diverge a lot.
 const FUN_MONEY_LOW_THRESHOLD = 25;
@@ -66,6 +85,7 @@ export default function BudgetPage() {
   const [showTreyWork, setShowTreyWork] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
   // Which person's fun-money card is expanded to show every entry below —
   // null, 'trey', or 'beryl'. Only one at a time; tapping the open one again
   // closes it.
@@ -184,6 +204,16 @@ export default function BudgetPage() {
     .filter((t) => t.category === 'trey-work')
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
+  // Target/Costco/Amazon transactions still sitting as a plain card-alert
+  // guess — no itemized split, no majority-category match — because no
+  // receipt/order email has come in for them yet. All-time, same reasoning
+  // as treyWorkTransactions above: this is a reconcile-against list, not a
+  // monthly view, and the point is to catch old gaps too, not just this
+  // month's.
+  const missingReceiptTransactions = [...budgetTransactions]
+    .filter((t) => RECEIPT_ELIGIBLE_MERCHANTS.some((m) => t.merchant.toLowerCase().includes(m)) && !isItemizedTransaction(t))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
   const recentFunActivity = funMoneyEntries
     .filter((f) => f.type === 'spend' || f.type === 'return')
     .sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -220,7 +250,24 @@ export default function BudgetPage() {
   return (
     <div className="page full-page active" id="page-budget">
       <div className="fp-sidebar">
-        <div className="fp-title">Budget</div>
+        <div className="fp-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
+          <span>Budget</span>
+          <button
+            className="add-btn"
+            style={{ padding: '0.05em 0.6em', fontSize: '0.6em', position: 'relative' }}
+            onClick={() => setShowHowTo(true)}
+          >
+            How to
+            {!!missingReceiptTransactions.length && (
+              <div
+                className="notif-badge"
+                style={{ position: 'absolute', top: '-0.5em', right: '-0.5em', width: '1.3em', height: '1.3em', fontSize: '0.85em' }}
+              >
+                {missingReceiptTransactions.length}
+              </div>
+            )}
+          </button>
+        </div>
         <div className="fp-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
           <button
             className="add-btn"
@@ -690,6 +737,11 @@ export default function BudgetPage() {
           )}
         </div>
       </div>
+      <HowToPanel
+        open={showHowTo}
+        onClose={() => setShowHowTo(false)}
+        missingReceiptTransactions={missingReceiptTransactions}
+      />
     </div>
   );
 }

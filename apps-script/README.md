@@ -205,12 +205,12 @@ receipt, the thread gets moved straight to the `Target Receipt` label with
 no manual labeling needed, and it works for Beryl too, not just whoever
 owns this script (self-addressing a screenshot only ever worked for Trey).
 A Costco receipt is recognized as well and parked under its own `Costco
-Receipt` label, ready for whenever a `processCostcoReceiptImports` gets
-built — nothing processes that label yet. Anything else (a genuinely
-unclear receipt, or an image that is not a receipt at all) falls through to
-`Family Agent/Needs Review` or the normal task/event parse as before.
-Manually applying the `Target Receipt` label directly still works too, if
-you'd rather not rely on the classification step.
+Receipt` label, processed by `processCostcoReceiptImports` (see below).
+Anything else (a genuinely unclear receipt, or an image that is not a
+receipt at all) falls through to `Family Agent/Needs Review` or the normal
+task/event parse as before. Manually applying the `Target Receipt` or
+`Costco Receipt` label directly still works too, if you'd rather not rely
+on the classification step.
 
 20. **Gmail filter for Target.com order confirmations**: Settings → Filters
     → Create a new filter → "From" = Target's order-confirmation sender
@@ -228,6 +228,32 @@ you'd rather not rely on the classification step.
 23. **Add a trigger**: Triggers page → Add Trigger → function
     `processTargetReceiptImports` → Time-driven → Minutes timer → Every 5
     minutes → Save.
+
+## Costco receipt import setup (T-11 Phase E)
+
+Costco has no order-confirmation emails and no per-item export at all, so
+unlike Target there is only the in-store path — `processCostcoReceiptImports`
+mirrors `processTargetReceiptImports` exactly (same itemized-split logic,
+same card-alert-row replace-or-append behavior), just with a Costco-specific
+Gemini prompt tuned for Costco's terse abbreviated item names (e.g. "KS
+BATH TISSU") instead of Target's department-labeled purchase history.
+
+23a. **No filter or label needed** — same as Target in-store receipts: email
+     a photo of the paper receipt to simpsonfamilyhubapp@gmail.com;
+     `processFamilyAgentEmails`/`routeReceiptImage_` recognizes it as Costco
+     and routes it to the `Costco Receipt` label automatically.
+23b. **Add a trigger**: Triggers page → Add Trigger → function
+     `processCostcoReceiptImports` → Time-driven → Minutes timer → Every 5
+     minutes → Save.
+
+Testing: email a photo of a Costco receipt to simpsonfamilyhubapp@gmail.com,
+confirm the thread moves to the `Costco Receipt` label (classification
+worked), then run `processCostcoReceiptImports` manually (or wait for its
+trigger) and check the Transactions tab for new rows tagged "Costco receipt
+import" in Notes, one per category, summing to the receipt total — same
+replace-existing-row-or-append-new behavior as Target. If item detail is
+missing for a Costco receipt processed before this pipeline existed, run
+`backfillCostcoReceiptItems` manually (mirrors `backfillTargetReceiptItems`).
 
 ## Manual recategorize / merchant memory / merchant rename (T-11 Phase D)
 
@@ -373,12 +399,13 @@ comes in already renamed.
 ## Changing the category list
 
 `TRANSACTION_CATEGORIES` in `family-agent.gs` is Trey's real household
-categories (set 2026-08-06: groceries, dining, gas-auto, travel, household,
+categories (set 2026-08-06, split 2026-08-10 to pull `subscriptions` out of
+`bills-utilities`: groceries, dining, gas-auto, travel, household,
 entertainment, healthcare, kids-activities, kids-other, bills-utilities,
-beryl-personal, trey-personal, shopping, trey-work, plus the structural
-one-time/other). `EXCLUDED_FROM_BUDGET` lists which categories don't count
-toward the regular monthly total (currently one-time and trey-work, since
-one is a major expense and the other gets reimbursed).
+subscriptions, beryl-personal, trey-personal, shopping, trey-work, plus the
+structural one-time/other). `EXCLUDED_FROM_BUDGET` lists which categories
+don't count toward the regular monthly total (currently one-time and
+trey-work, since one is a major expense and the other gets reimbursed).
 
 The **Budget Targets** tab is only auto-populated with category rows the
 first time it's created — changing the category list later does not update
@@ -452,3 +479,11 @@ current category list.
   this only happens if you manually re-apply the "Target Receipt" label to
   an already-processed thread — normal use (label once, let it move to
   Target Receipt/Done) does not hit this.
+- Costco receipt import shares every one of the above Target receipt
+  caveats (same duplicate-protection weakness, same proportional tax split)
+  since it's the same code path with a different prompt. It has one
+  Costco-specific risk on top: Costco's abbreviated item names (e.g. "ORG
+  SPINACH", a numeric item code with no department label) give Gemini less
+  to go on than Target's clearer department headers, so miscategorized
+  items are more likely — worth a periodic glance at the category totals
+  for anything that looks off, correctable as usual via recategorize.
