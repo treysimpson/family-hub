@@ -33,7 +33,14 @@ Everything is committed and pushed to GitHub — nothing lives only on one PC. T
 5. **`npm run dev`** starts the app at `http://localhost:5183/family-hub/` (port is pinned in `vite.config.js` — this exact origin is authorized in the OAuth client; don't change it without also adding the new one in Google Cloud Console → APIs & Services → Credentials → "Family Hub Web Client"). Sign-in, Calendar, Tasks, Groceries, and the email agent are all live and tested (T-01–T-09 done, see To-do list below) — the remaining work is whatever Future backlog item (T-10+) gets prioritized next, or the Chores rebuild (custom localStorage-based recurrence + points system) discussed but not yet started.
 6. If anything errors, check the browser console — `AppContext.jsx`'s `calendarError`/`tasksError` state and `googleAuth.js`'s `authError` are surfaced but not yet shown anywhere in the UI beyond the Settings panel's sign-in button, so console logs are the fastest way to see what broke.
 
-**Nothing is machine-specific** — no local-only config, no secrets in untracked files, no machine-specific paths in the codebase. The OAuth client ID is public-safe and lives directly in `src/lib/googleAuth.js`.
+**Nothing is machine-specific** — no local-only config, no secrets in untracked files, no machine-specific paths in the codebase. The OAuth client ID is public-safe and lives directly in `src/lib/googleAuth.js`. One exception: the Budget PIN lives in browser `localStorage`, not the sheet — a different browser/machine won't have it and will prompt to set a new one the first time Budget is opened there, which is expected, not a bug.
+
+### Right now (as of 2026-08-11)
+
+- **Outstanding manual step**: the current `apps-script/family-agent.gs` (with `processCostcoReceiptImports`, added 2026-08-10) has **not yet been pasted into script.google.com** — the Costco pipeline exists in the repo but isn't live yet. To deploy: paste the file into the Apps Script editor (see "One-time setup" note in `apps-script/README.md` — Apps Script doesn't deploy from GitHub), then add its trigger (steps 23a/23b in the same README).
+- **Next up**, in the order Trey wants them:
+  1. Once the script's pasted in and live, test the Costco pipeline against a real receipt — email a photo to simpsonfamilyhubapp@gmail.com, confirm it lands under the `Costco Receipt` label, then run/wait for `processCostcoReceiptImports` and check the category split looks right. This is the first real check of the Costco-specific Gemini prompt — its abbreviated item names/codes are a rougher categorization target than Target's clearer department headers, so worth a closer look than usual.
+  2. Design + build **hide-surprise-transactions** (T-11's last undesigned piece, see its row below) — hiding a transaction (e.g. a Christmas gift) from the shared wall display after it's already been shown may be too late, so this likely needs to be proactive (a message-driven "hide the last transaction," similar to the fun-money pattern, or a standing list of gift-prone merchants) rather than a reactive in-app toggle. Not designed yet.
 
 ---
 
