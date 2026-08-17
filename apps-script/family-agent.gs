@@ -169,9 +169,15 @@ function processFamilyAgentEmails() {
       // rather than a self-addressed email, so anyone in the family can
       // send one. Route it to the right store-specific label instead of
       // running it through the task/event/grocery parser below, which
-      // would just fail on it.
-      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
-      if (image && routeReceiptImage_(thread, inboxLabel, image)) return;
+      // would just fail on it. If several receipts are attached to one
+      // email (a same-store batch -- see processCostcoReceiptImports),
+      // only the first is classified to decide routing; the store-specific
+      // importer then processes every attachment on the message, not just
+      // this one. Mixed stores in one email are not supported -- only the
+      // first attachment's store is detected, so the rest would be parsed
+      // with that same store's prompt.
+      const receiptAttachments = findReceiptAttachments_(message);
+      if (receiptAttachments.length && routeReceiptImage_(thread, inboxLabel, receiptAttachments[0])) return;
 
       const text = `${message.getSubject()}\n\n${message.getPlainBody()}`.trim();
       const results = parseWithGemini_(text); // array — one entry per requested item
@@ -194,13 +200,40 @@ function processFamilyAgentEmails() {
   });
 }
 
-// Classifies an image attachment and, if it is a recognized store receipt,
-// moves the thread straight to that store's own label so its dedicated
-// pipeline (processTargetReceiptImports for Target) picks it up on its next
-// run. Returns true if it handled (moved) the thread -- the caller should
-// skip the normal task/event/grocery parse in that case. Returns false for
-// "not a recognized receipt," so the caller falls through to the normal
-// parse as usual (e.g. a photo attached to an ordinary to-do request).
+// Finds every attachment worth trying as a receipt -- each a photo/
+// screenshot (image/*) or a PDF (e.g. Safari's "print to PDF" on an
+// itemized purchase-history page, or a saved digital receipt). Gemini's
+// inline_data understanding handles both mime types identically, so every
+// receipt call site shares this one lookup instead of each hand-filtering
+// attachments by content type. Returns an array (possibly empty) so a
+// same-store batch of several receipts in one email -- e.g. multiple Costco
+// trips -- gets every attachment, not just the first (see the multi-receipt
+// loop in processCostcoReceiptImports/processTargetReceiptImports).
+function findReceiptAttachments_(message) {
+  return message.getAttachments().filter((a) => {
+    const type = a.getContentType();
+    return type.indexOf('image/') === 0 || type === 'application/pdf';
+  });
+}
+
+// message.getId() alone is the EmailId key for a single-receipt email (the
+// common case), so historical Order Items/Transactions rows written before
+// multi-receipt support are unaffected. A batch of several receipts in one
+// email instead gets one distinct key per attachment ("<messageId>#<index>")
+// so their item-detail rows don't collide under Order Items' EmailId lookup
+// (src/context/AppContext.jsx's orderItemsByEmailId groups by this exact
+// key).
+function receiptEmailId_(messageId, index, total) {
+  return total > 1 ? messageId + '#' + index : messageId;
+}
+
+// Classifies an image/PDF attachment and, if it is a recognized store
+// receipt, moves the thread straight to that store's own label so its
+// dedicated pipeline (processTargetReceiptImports for Target) picks it up on
+// its next run. Returns true if it handled (moved) the thread -- the caller
+// should skip the normal task/event/grocery parse in that case. Returns
+// false for "not a recognized receipt," so the caller falls through to the
+// normal parse as usual (e.g. a photo attached to an ordinary to-do request).
 function routeReceiptImage_(thread, inboxLabel, image) {
   const classification = classifyReceiptImageWithGemini_(image);
   if (!classification || !classification.isReceipt) return false;
@@ -464,40 +497,70 @@ function processTargetReceiptImports() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
-      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+      const images = findReceiptAttachments_(message);
 
-      if (!image) {
+      if (!images.length) {
         moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_REVIEW));
         return;
       }
 
-      const receipt = parseTargetReceiptWithGemini_(image);
-      if (!receipt || !receipt.categories || !receipt.categories.length) {
-        moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_REVIEW));
-        return;
-      }
+      // A same-store batch (e.g. several Target receipts forwarded in one
+      // email) processes every attachment, not just the first -- each gets
+      // its own EmailId (receiptEmailId_) so their Order Items rows don't
+      // collide. If any attachment fails to parse, the successful ones are
+      // still kept (not rolled back) but the thread goes to Needs Review
+      // instead of Done, same "don't lose the good ones, but don't hide the
+      // failure either" reasoning as processFamilyAgentEmails.
+      let anySucceeded = false;
+      let anyFailed = false;
 
-      const existingRow = findTransactionRow_(sheet, receipt.date, receipt.total);
-      if (existingRow !== -1) {
-        // A card-alert email already created a single coarse row for this
-        // charge -- replace it with the real itemized split instead of
-        // double-counting the same charge.
-        splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, 'Target receipt import', message.getId());
-      } else {
-        // No matching card-alert row (e.g. it has not arrived yet, or the
-        // purchase was not on a card with alerts enabled) -- add the split
-        // as new rows directly, same as how statement import fills a gap.
-        computeCategorySplit_(receipt.categories, receipt.total).forEach((c) => {
-          appendTransactionRow_(
-            sheet,
-            { date: receipt.date, card: '', merchant: 'Target', amount: c.amount, category: c.category, notes: 'Target receipt import' },
-            message.getId()
-          );
-        });
-      }
-      appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+      images.forEach((image, i) => {
+        const receipt = parseTargetReceiptWithGemini_(image);
+        if (!receipt || !receipt.categories || !receipt.categories.length) {
+          anyFailed = true;
+          return;
+        }
+        const emailId = receiptEmailId_(message.getId(), i, images.length);
 
-      moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_DONE));
+        // A negative total means the receipt/photo is a return or refund
+        // slip (see buildTargetReceiptPrompt_), not a purchase -- tag it
+        // distinctly so the Hub app can flag it as a return rather than a
+        // normal spend (BudgetPage.jsx's ITEMIZED_NOTES_MARKERS matches on
+        // "return").
+        const notesTag = receipt.total < 0 ? 'Target return' : 'Target receipt import';
+
+        const existingRow = findTransactionRow_(sheet, receipt.date, receipt.total);
+        if (existingRow !== -1) {
+          // A card-alert email already created a single coarse row for this
+          // charge -- replace it with the real itemized split instead of
+          // double-counting the same charge. In practice this branch almost
+          // never fires for a return, since a return's negative total will
+          // essentially never match an existing (positive) purchase row.
+          splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, notesTag, emailId);
+        } else {
+          // No matching card-alert row (e.g. it has not arrived yet, or the
+          // purchase was not on a card with alerts enabled) -- add the split
+          // as new rows directly, same as how statement import fills a gap.
+          // This is also the normal path for a return: it becomes its own new
+          // negative-amount row(s) rather than editing whatever earlier
+          // purchase it refunds, since reliably matching a return back to one
+          // specific original purchase/line-item is not something this can
+          // do robustly (dates differ, a return may cover only some items).
+          // The Transactions total/category sums still net out correctly on
+          // their own, since they're a plain SUM over signed amounts.
+          computeCategorySplit_(receipt.categories, receipt.total).forEach((c) => {
+            appendTransactionRow_(
+              sheet,
+              { date: receipt.date, card: '', merchant: 'Target', amount: c.amount, category: c.category, notes: notesTag },
+              emailId
+            );
+          });
+        }
+        appendOrderItems_(spreadsheet, emailId, receipt.categories);
+        anySucceeded = true;
+      });
+
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(anySucceeded && !anyFailed ? TARGET_RECEIPT_LABEL_DONE : TARGET_RECEIPT_LABEL_REVIEW));
     } catch (err) {
       Logger.log('Failed to process Target receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(TARGET_RECEIPT_LABEL_REVIEW));
@@ -523,34 +586,48 @@ function processCostcoReceiptImports() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
-      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
+      const images = findReceiptAttachments_(message);
 
-      if (!image) {
+      if (!images.length) {
         moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
         return;
       }
 
-      const receipt = parseCostcoReceiptWithGemini_(image);
-      if (!receipt || !receipt.categories || !receipt.categories.length) {
-        moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
-        return;
-      }
+      // See the matching comment in processTargetReceiptImports for the
+      // same-store-batch reasoning (multiple Costco receipts in one email)
+      // and the anySucceeded/anyFailed Done-vs-Review logic below.
+      let anySucceeded = false;
+      let anyFailed = false;
 
-      const existingRow = findTransactionRow_(sheet, receipt.date, receipt.total);
-      if (existingRow !== -1) {
-        splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, 'Costco receipt import', message.getId());
-      } else {
-        computeCategorySplit_(receipt.categories, receipt.total).forEach((c) => {
-          appendTransactionRow_(
-            sheet,
-            { date: receipt.date, card: '', merchant: 'Costco', amount: c.amount, category: c.category, notes: 'Costco receipt import' },
-            message.getId()
-          );
-        });
-      }
-      appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+      images.forEach((image, i) => {
+        const receipt = parseCostcoReceiptWithGemini_(image);
+        if (!receipt || !receipt.categories || !receipt.categories.length) {
+          anyFailed = true;
+          return;
+        }
+        const emailId = receiptEmailId_(message.getId(), i, images.length);
 
-      moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_DONE));
+        // A negative total means this is a return/refund slip, not a
+        // purchase -- see the matching comment in processTargetReceiptImports.
+        const notesTag = receipt.total < 0 ? 'Costco return' : 'Costco receipt import';
+
+        const existingRow = findTransactionRow_(sheet, receipt.date, receipt.total);
+        if (existingRow !== -1) {
+          splitTransactionRow_(sheet, existingRow, receipt.categories, receipt.total, notesTag, emailId);
+        } else {
+          computeCategorySplit_(receipt.categories, receipt.total).forEach((c) => {
+            appendTransactionRow_(
+              sheet,
+              { date: receipt.date, card: '', merchant: 'Costco', amount: c.amount, category: c.category, notes: notesTag },
+              emailId
+            );
+          });
+        }
+        appendOrderItems_(spreadsheet, emailId, receipt.categories);
+        anySucceeded = true;
+      });
+
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(anySucceeded && !anyFailed ? COSTCO_RECEIPT_LABEL_DONE : COSTCO_RECEIPT_LABEL_REVIEW));
     } catch (err) {
       Logger.log('Failed to process Costco receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(COSTCO_RECEIPT_LABEL_REVIEW));
@@ -918,7 +995,7 @@ function buildTargetOrderPrompt_(text) {
 const RECEIPT_CLASSIFY_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    isReceipt: { type: 'BOOLEAN', description: 'True if the image is a purchase receipt, order confirmation, or itemized purchase-history screenshot' },
+    isReceipt: { type: 'BOOLEAN', description: 'True if the image is a purchase receipt, order confirmation, itemized purchase-history screenshot, or a return/refund receipt' },
     store: { type: 'STRING', enum: ['target', 'costco', 'other'], nullable: true, description: 'Which store the receipt is from, based on logos, headers, or formatting -- "other" if it is a receipt but not clearly one of the named stores' },
   },
   required: ['isReceipt'],
@@ -931,7 +1008,7 @@ function classifyReceiptImageWithGemini_(imageBlob) {
   const base64 = Utilities.base64Encode(imageBlob.getBytes());
   const mimeType = imageBlob.getContentType();
   const prompt = [
-    'You are given an image attached to a family household email. Determine whether this image is a purchase receipt, order confirmation, or itemized purchase-history screenshot, as opposed to some other kind of photo entirely (for example a family photo, a school flyer, or a screenshot unrelated to shopping).',
+    'You are given an image or PDF attached to a family household email. Determine whether it is a purchase receipt, order confirmation, itemized purchase-history screenshot, or a return/refund receipt (money credited back for returned items), as opposed to some other kind of photo or document entirely (for example a family photo, a school flyer, or a screenshot unrelated to shopping). A return/refund receipt still counts as a receipt here -- it just represents money coming back rather than being spent.',
     '',
     'If it is a receipt of that kind, also identify which store it is from based on logos, headers, or formatting.',
   ].join('\n');
@@ -971,14 +1048,14 @@ const TARGET_RECEIPT_SCHEMA = {
   type: 'OBJECT',
   properties: {
     date: { type: 'STRING', description: 'YYYY-MM-DD' },
-    total: { type: 'NUMBER', description: 'The actual amount charged, including tax' },
+    total: { type: 'NUMBER', description: 'The actual amount charged, including tax -- NEGATIVE if this is a return/refund receipt rather than a purchase' },
     categories: {
       type: 'ARRAY',
       items: {
         type: 'OBJECT',
         properties: {
           category: { type: 'STRING', enum: ITEMIZED_CATEGORIES },
-          subtotal: { type: 'NUMBER', description: 'Pre-tax subtotal of the items placed in this category' },
+          subtotal: { type: 'NUMBER', description: 'Pre-tax subtotal of the items placed in this category, as a POSITIVE number even on a return -- only the top-level "total" carries the sign' },
           items: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Plain item names placed in this category, no prices' },
         },
         required: ['category', 'subtotal', 'items'],
@@ -1029,12 +1106,12 @@ function parseTargetReceiptWithGemini_(imageBlob) {
 
 function buildTargetReceiptPrompt_() {
   return [
-    'You are given a screenshot of an itemized Target purchase from the Target app purchase history screen, or a photo of a paper Target receipt. Extract the purchase as JSON.',
+    'You are given a screenshot of an itemized Target purchase or return from the Target app purchase history screen, or a photo of a paper Target receipt or return slip. Extract it as JSON.',
     '',
     'Rules:',
-    '- "date" is the purchase date in YYYY-MM-DD format.',
-    '- "total" is the actual amount charged, including tax, as a plain number.',
-    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt, with no prices included.',
+    '- "date" is the purchase or return date in YYYY-MM-DD format.',
+    '- If this is a RETURN or REFUND (money credited back for returned items, e.g. headed "Return", "Refund", or showing a credit rather than a charge), make "total" the refunded amount as a NEGATIVE number. Otherwise (a normal purchase), "total" is the actual amount charged, including tax, as a positive number.',
+    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. Map common Target departments onto this list, for example: Grocery or Food and Beverage maps to groceries, Beauty or Health maps to healthcare, Toys or Baby or Kids Clothing maps to kids-other, Home or Electronics or Kitchen maps to household, Apparel or Shoes maps to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category, as a POSITIVE number even on a return -- only the top-level "total" carries the negative sign. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt, with no prices included.',
   ].join('\n');
 }
 
@@ -1084,12 +1161,12 @@ function parseCostcoReceiptWithGemini_(imageBlob) {
 
 function buildCostcoReceiptPrompt_() {
   return [
-    'You are given a photo of a paper Costco warehouse receipt. Extract the purchase as JSON.',
+    'You are given a photo of a paper Costco warehouse receipt, which may be a purchase or a return/refund slip from the membership desk. Extract it as JSON.',
     '',
     'Costco receipts print terse abbreviated item names and a numeric item code, not a department header the way a Target receipt does (e.g. "ORG SPINACH", "KS BATH TISSU", "ROTISS CHKN") -- there is also no separate tax line for most grocery items (food is generally untaxed), but non-food items usually do have tax, and an "E" printed after a line\'s price marks it as exempt from tax, everything else is generally taxable. Use general knowledge of what a cryptic Costco item name usually refers to (e.g. "KS" prefix means Kirkland Signature, Costco\'s store brand, not a category by itself -- categorize by what the product actually is) to decide its category. A membership renewal charge, if present as its own line, is "bills-utilities". Gas station fuel purchases (separate from the warehouse receipt, if included) are "gas-auto".',
-    '- "date" is the purchase date in YYYY-MM-DD format.',
-    '- "total" is the actual amount charged, including tax, as a plain number.',
-    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. For example: fresh food, pantry items, and beverages map to groceries; vitamins, medicine, and personal care map to healthcare; diapers, kids clothing, and toys map to kids-other; electronics, home goods, and cleaning supplies map to household; adult clothing map to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt (abbreviated is fine), with no prices included.',
+    '- "date" is the purchase or return date in YYYY-MM-DD format.',
+    '- If this is a RETURN or REFUND (a membership-desk return slip, or any receipt showing money credited back rather than charged), make "total" the refunded amount as a NEGATIVE number. Otherwise (a normal warehouse purchase), "total" is the actual amount charged, including tax, as a positive number.',
+    '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. For example: fresh food, pantry items, and beverages map to groceries; vitamins, medicine, and personal care map to healthcare; diapers, kids clothing, and toys map to kids-other; electronics, home goods, and cleaning supplies map to household; adult clothing map to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category, as a POSITIVE number even on a return -- only the top-level "total" carries the negative sign. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt (abbreviated is fine), with no prices included.',
   ].join('\n');
 }
 
@@ -1268,10 +1345,13 @@ function backfillTargetReceiptItems() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
-      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
-      if (!image) return;
-      const receipt = parseTargetReceiptWithGemini_(image);
-      if (receipt && receipt.categories) appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+      const images = findReceiptAttachments_(message);
+      images.forEach((image, i) => {
+        const receipt = parseTargetReceiptWithGemini_(image);
+        if (receipt && receipt.categories) {
+          appendOrderItems_(spreadsheet, receiptEmailId_(message.getId(), i, images.length), receipt.categories);
+        }
+      });
     } catch (err) {
       Logger.log('Failed to backfill items for Target receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
     }
@@ -1286,10 +1366,13 @@ function backfillCostcoReceiptItems() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
-      const image = message.getAttachments().find((a) => a.getContentType().indexOf('image/') === 0);
-      if (!image) return;
-      const receipt = parseCostcoReceiptWithGemini_(image);
-      if (receipt && receipt.categories) appendOrderItems_(spreadsheet, message.getId(), receipt.categories);
+      const images = findReceiptAttachments_(message);
+      images.forEach((image, i) => {
+        const receipt = parseCostcoReceiptWithGemini_(image);
+        if (receipt && receipt.categories) {
+          appendOrderItems_(spreadsheet, receiptEmailId_(message.getId(), i, images.length), receipt.categories);
+        }
+      });
     } catch (err) {
       Logger.log('Failed to backfill items for Costco receipt thread "%s": %s', thread.getFirstMessageSubject(), err);
     }

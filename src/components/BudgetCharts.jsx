@@ -31,9 +31,19 @@ function buildSankeyData(monthTransactions, fixedBillMerchants) {
       bucket[t.category] = (bucket[t.category] || 0) + t.amount;
     });
 
-  const fixedTotal = Object.values(fixedByCategory).reduce((s, v) => s + v, 0);
-  const discretionaryTotal = Object.values(discretionaryByCategory).reduce((s, v) => s + v, 0);
-  const categories = new Set([...Object.keys(fixedByCategory), ...Object.keys(discretionaryByCategory)]);
+  // A category can legitimately net to zero or negative for a month now
+  // that returns/refunds post as their own negative-amount rows (e.g. a
+  // category whose only transaction that month was a return) -- a Sankey
+  // link or pie slice can't represent a negative flow, so those categories
+  // are dropped from the chart entirely rather than shown as $0 or negative.
+  // The real (possibly negative) numbers still drive the actual totals
+  // elsewhere on the page (budgetCategoryTotals in AppContext.jsx) -- this
+  // filtering is chart-display-only.
+  const fixedEntries = Object.entries(fixedByCategory).filter(([, v]) => v > 0);
+  const discretionaryEntries = Object.entries(discretionaryByCategory).filter(([, v]) => v > 0);
+  const fixedTotal = fixedEntries.reduce((s, [, v]) => s + v, 0);
+  const discretionaryTotal = discretionaryEntries.reduce((s, [, v]) => s + v, 0);
+  const categories = new Set([...fixedEntries, ...discretionaryEntries].map(([c]) => c));
 
   const nodes = [
     { id: 'Total Spend' },
@@ -44,20 +54,25 @@ function buildSankeyData(monthTransactions, fixedBillMerchants) {
   const links = [
     ...(fixedTotal > 0 ? [{ source: 'Total Spend', target: 'Fixed', value: fixedTotal }] : []),
     ...(discretionaryTotal > 0 ? [{ source: 'Total Spend', target: 'Discretionary', value: discretionaryTotal }] : []),
-    ...Object.entries(fixedByCategory).map(([c, v]) => ({ source: 'Fixed', target: formatCategoryLabel(c), value: v })),
-    ...Object.entries(discretionaryByCategory).map(([c, v]) => ({ source: 'Discretionary', target: formatCategoryLabel(c), value: v })),
+    ...fixedEntries.map(([c, v]) => ({ source: 'Fixed', target: formatCategoryLabel(c), value: v })),
+    ...discretionaryEntries.map(([c, v]) => ({ source: 'Discretionary', target: formatCategoryLabel(c), value: v })),
   ];
   return { nodes, links };
 }
 
 export default function BudgetCharts({ monthLabel, monthTransactions, categoryTotals, fixedBillMerchants, trendMonths, trendTotals }) {
   const sankeyData = buildSankeyData(monthTransactions, fixedBillMerchants);
-  const pieData = Object.entries(categoryTotals).map(([category, amount]) => ({
-    id: formatCategoryLabel(category),
-    label: formatCategoryLabel(category),
-    value: amount,
-    color: colorForCategory(category),
-  }));
+  // Same reasoning as buildSankeyData above -- a pie slice can't be negative,
+  // so a category that nets to zero or negative for the month (e.g. only a
+  // return posted) is left out of the pie rather than shown as $0/negative.
+  const pieData = Object.entries(categoryTotals)
+    .filter(([, amount]) => amount > 0)
+    .map(([category, amount]) => ({
+      id: formatCategoryLabel(category),
+      label: formatCategoryLabel(category),
+      value: amount,
+      color: colorForCategory(category),
+    }));
   const lineData = [{
     id: 'Total spend',
     data: trendMonths.map((label, i) => ({ x: label, y: trendTotals[i] })),

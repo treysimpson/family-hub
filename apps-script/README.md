@@ -198,19 +198,22 @@ per-item prices:
 **Getting a receipt screenshot labeled** (added 2026-08-09): email it to
 **simpsonfamilyhubapp@gmail.com**, the same shared address everything else
 in the app uses — not yourself. `processFamilyAgentEmails` now checks any
-image attachment on a Family Agent email with a cheap Gemini classification
-pass (`routeReceiptImage_`/`classifyReceiptImageWithGemini_`) before trying
-to parse it as a task/event/grocery request: if it recognizes a Target
+image *or PDF* attachment (`findReceiptAttachment_`, PDF support added
+2026-08-17) on a Family Agent email with a cheap Gemini classification pass
+(`routeReceiptImage_`/`classifyReceiptImageWithGemini_`) before trying to
+parse it as a task/event/grocery request: if it recognizes a Target
 receipt, the thread gets moved straight to the `Target Receipt` label with
 no manual labeling needed, and it works for Beryl too, not just whoever
 owns this script (self-addressing a screenshot only ever worked for Trey).
 A Costco receipt is recognized as well and parked under its own `Costco
 Receipt` label, processed by `processCostcoReceiptImports` (see below).
-Anything else (a genuinely unclear receipt, or an image that is not a
+Anything else (a genuinely unclear receipt, or an image/PDF that is not a
 receipt at all) falls through to `Family Agent/Needs Review` or the normal
 task/event parse as before. Manually applying the `Target Receipt` or
 `Costco Receipt` label directly still works too, if you'd rather not rely
-on the classification step.
+on the classification step. A PDF works exactly like an image here — e.g.
+Safari's "print to PDF" or "save as PDF" on the Target app's or Costco
+app's itemized purchase-history screen, no photo needed.
 
 20. **Gmail filter for Target.com order confirmations**: Settings → Filters
     → Create a new filter → "From" = Target's order-confirmation sender
@@ -254,6 +257,91 @@ import" in Notes, one per category, summing to the receipt total — same
 replace-existing-row-or-append-new behavior as Target. If item detail is
 missing for a Costco receipt processed before this pipeline existed, run
 `backfillCostcoReceiptItems` manually (mirrors `backfillTargetReceiptItems`).
+
+**Gotcha hit during first real test (2026-08-17)**: `inboxLabel.getThreads()`
+can lag a few minutes behind a label just being applied by the classifier —
+running `processCostcoReceiptImports` immediately after the thread moved to
+`Costco Receipt` found zero threads and silently did nothing (no error, no
+log — `if (!threads.length) return;` exits before anything is logged). If a
+thread sits under `Costco Receipt` with neither `Done` nor `Needs Review`,
+wait a minute or two and run the function again rather than assuming
+something is broken. Also easy to mix up with `backfillCostcoReceiptItems`
+(reads only the `Done` label, for recovering item detail on already-processed
+receipts) — that one silently no-ops on anything still sitting in the plain
+`Costco Receipt` inbox label, which looks identical to the lag issue above.
+
+### Return/refund receipts (added 2026-08-17)
+
+`processTargetReceiptImports`/`processCostcoReceiptImports` also handle a
+return or refund slip (e.g. a Costco membership-desk return, or a Target
+return receipt) — send it in exactly the same way as a purchase receipt,
+photo or PDF, to simpsonfamilyhubapp@gmail.com. `classifyReceiptImageWithGemini_`
+now recognizes a return/refund receipt as a receipt worth routing (its
+earlier prompt only mentioned purchase receipts/order confirmations, so a
+return could have been misclassified as "not a receipt" and fallen through
+to `Needs Review` or the plain task parser instead). `buildTargetReceiptPrompt_`/
+`buildCostcoReceiptPrompt_` now instruct Gemini to report `total` as a
+**negative** number when the document is a return, while keeping each
+category's `subtotal` a positive magnitude (so `computeCategorySplit_`'s
+proportional-share math still works — it multiplies each category's
+positive share by the signed total, which naturally produces correctly
+signed per-category amounts). The resulting rows get tagged `"<Store>
+return"` in Notes (vs. `"<Store> receipt import"` for a purchase) — this is
+also picked up by the Hub app's `ITEMIZED_NOTES_MARKERS` heuristic
+(`src/pages/BudgetPage.jsx`) so a return doesn't get flagged as a "missing
+receipt."
+
+There is deliberately no attempt to link a return back to one specific
+original purchase row or split its original category allocation — a return
+receipt's date rarely matches the original purchase's, and a return may
+cover only some items from a larger receipt, so any auto-matching would be
+fragile. Instead a return just posts as its own new negative-amount row
+(or rows, if it spans categories), the same way `existingRow` matching
+already works: `findTransactionRow_` searches for an existing row at that
+exact (date, amount), which a negative return total will essentially never
+match against an existing positive purchase row, so it always takes the
+"append as new rows" path. The month/category totals on the Budget page are
+plain sums over signed amounts, so a return correctly subtracts from both
+without any special-casing there.
+
+The Hub app displays a return with a coral "↩ Return" badge next to its
+category tag, its amount in coral (any negative amount now gets this
+treatment, not just returns), and — if you expand "Details" — the returned
+item names shown with strikethrough.
+
+One caveat: `BudgetCharts.jsx`'s Sankey and pie charts can't render a
+negative link/slice, so a category that nets to zero or negative for a
+month (e.g. the only transaction in that category that month was a return)
+is simply left out of those two charts for that month — the actual
+month/category totals elsewhere on the page are unaffected, this is
+chart-display-only. The 6-month category bar chart (`CategoryTrendChart.jsx`)
+has no such issue and will correctly show a bar dipping below zero.
+
+### Multiple receipts in one email (added 2026-08-17)
+
+You can attach several receipts to a single email as long as they're all
+the **same store** (e.g. three Costco receipts from three different trips) —
+`findReceiptAttachments_` (renamed from the old singular
+`findReceiptAttachment_`) now returns every image/PDF attachment instead of
+just the first, and `processTargetReceiptImports`/`processCostcoReceiptImports`
+loop over all of them, parsing and recording each independently. Each
+attachment gets its own row(s) in Transactions and its own entry in Order
+Items, keyed by `receiptEmailId_` — `<messageId>` alone for a single-receipt
+email (unchanged from before, so nothing about existing data's keys
+changes), or `<messageId>#<index>` per attachment when there's more than
+one, so a batch's item-detail rows don't collide with each other under the
+Order Items tab's EmailId lookup. If some attachments in a batch parse fine
+and others don't, the successful ones are still written (not rolled back),
+but the thread goes to `Needs Review` rather than `Done` so the failure
+isn't silently lost — same reasoning `processFamilyAgentEmails` already uses
+for a partially-actionable multi-item request.
+
+**Mixed stores in one email are not supported** — only the *first*
+attachment gets classified to decide which store label the whole thread
+routes to (`routeReceiptImage_` in `processFamilyAgentEmails`), so a Target
+receipt mixed in with Costco receipts in the same email would get run
+through the Costco-specific prompt and very likely come out miscategorized.
+If you need to send different stores, use separate emails.
 
 ## Manual recategorize / merchant memory / merchant rename (T-11 Phase D)
 
@@ -487,3 +575,9 @@ current category list.
   to go on than Target's clearer department headers, so miscategorized
   items are more likely — worth a periodic glance at the category totals
   for anything that looks off, correctable as usual via recategorize.
+- `findReceiptAttachments_` reads every image/PDF attachment on a message
+  (see "Multiple receipts in one email" above), but only same-store batches
+  are supported — the first attachment's classification decides which
+  store's prompt the *whole* batch gets parsed with. `processStatementImports`
+  still only reads the first PDF attachment for statement imports (a
+  separate, unrelated limitation — that pipeline was not touched here).

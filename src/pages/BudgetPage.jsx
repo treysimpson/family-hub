@@ -56,14 +56,27 @@ const RECEIPT_ELIGIBLE_MERCHANTS = ['target', 'costco', 'amazon'];
 // column with one of these substrings (appendTransactionRow_ call sites:
 // applyAmazonOrder_ writes "Order <n>", applyTargetOrder_ writes "Order
 // <n>; Target itemized", the receipt-import paths write "<Store> receipt
-// import"), so a row without any of them is still just the plain card-alert
-// guess — heuristic, not a real flag column, so a coincidental "order" in a
-// Gemini-extracted note on an unrelated purchase would false-negative here.
-const ITEMIZED_NOTES_MARKERS = ['order ', 'itemized', 'receipt import'];
+// import" or "<Store> return"), so a row without any of them is still just
+// the plain card-alert guess — heuristic, not a real flag column, so a
+// coincidental "order" in a Gemini-extracted note on an unrelated purchase
+// would false-negative here.
+const ITEMIZED_NOTES_MARKERS = ['order ', 'itemized', 'receipt import', 'return'];
 
 function isItemizedTransaction(t) {
   const notes = (t.notes || '').toLowerCase();
   return ITEMIZED_NOTES_MARKERS.some((marker) => notes.includes(marker));
+}
+
+// processTargetReceiptImports/processCostcoReceiptImports tag a return or
+// refund slip's rows with "<Store> return" in Notes (vs. "<Store> receipt
+// import" for a normal purchase) — see the matching comment in
+// family-agent.gs. There is no attempt to link a return back to one
+// specific original purchase row (dates differ, a return may cover only
+// some items from a receipt) — it just shows up as its own negative-amount
+// row, which nets correctly into every total/category sum on its own since
+// those are plain SUMs over signed amounts.
+function isReturnTransaction(t) {
+  return (t.notes || '').toLowerCase().includes('return');
 }
 
 // Flat $25 warning line rather than a percentage — both pools are $250/mo
@@ -566,6 +579,7 @@ export default function BudgetPage() {
             const isRenaming = renamingRow === t.row;
             const isPendingScope = pendingCategory?.row === t.row;
             const isEditingCategory = editingRow === t.row && !isPendingScope;
+            const isReturn = isReturnTransaction(t);
             // Only Target order/receipt splits ever have entries here — Amazon
             // itemization and statement import never get real per-item names
             // from Gemini, so those transactions just have no Details control.
@@ -651,6 +665,11 @@ export default function BudgetPage() {
                     ) : (
                       <span className="task-tag tag-family">{formatCategoryLabel(t.category)}</span>
                     )}
+                    {isReturn && (
+                      <span className="task-tag" style={{ background: 'var(--ev-coral-bg)', color: 'var(--ev-coral-tx)' }}>
+                        ↩ Return
+                      </span>
+                    )}
                     {hasDetails && (
                       <span
                         className="task-due"
@@ -662,12 +681,15 @@ export default function BudgetPage() {
                     )}
                   </div>
                   {hasDetails && showingDetails && (
-                    <div style={{ fontSize: '0.78em', color: 'var(--text-muted)', marginTop: '0.4em' }} onClick={(e) => e.stopPropagation()}>
+                    <div
+                      style={{ fontSize: '0.78em', color: 'var(--text-muted)', marginTop: '0.4em', textDecoration: isReturn ? 'line-through' : 'none' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {items.map((i) => i.item).join(', ')}
                     </div>
                   )}
                 </div>
-                <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)' }}>
+                <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)', color: t.amount < 0 ? 'var(--ev-coral-tx)' : undefined }}>
                   {formatCurrency(t.amount)}
                 </div>
               </div>
