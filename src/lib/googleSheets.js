@@ -16,7 +16,9 @@ export const TRANSACTION_CATEGORIES = [
 ];
 
 // Column order must match appendTransactionRow_ in apps-script/family-agent.gs.
-const TRANSACTIONS_RANGE = 'Transactions!A2:G';
+// Column H (Hidden) is written directly by the Apps Script's hide_transaction
+// action (not by appendTransactionRow_, which never creates a row pre-hidden).
+const TRANSACTIONS_RANGE = 'Transactions!A2:H';
 const BUDGET_TARGETS_RANGE = 'Budget Targets!A2:B';
 const FIXED_BILLS_RANGE = 'Fixed Bills!A2:A';
 const FUN_MONEY_RANGE = 'Fun Money!A2:E';
@@ -81,6 +83,13 @@ async function appendRange_(accessToken, spreadsheetId, sheetName, values) {
 // "row" is the 1-indexed sheet row (accounting for the header), so a
 // recategorize action can target the exact cell without re-scanning the
 // sheet for a match.
+// Hidden transactions (column H, set by the Apps Script's hide_transaction
+// action -- see hide-surprise-transactions, T-11) are filtered out here, not
+// just excluded from a display list -- they should never factor into any
+// total, category breakdown, or chart. "row" is still computed from the
+// pre-filter index so it keeps pointing at the correct sheet row for
+// recategorize/rename, which only ever operate on transactions the app
+// actually rendered.
 export async function fetchTransactions(accessToken, spreadsheetId = BUDGET_SPREADSHEET_ID) {
   const rows = await fetchRange_(accessToken, spreadsheetId, TRANSACTIONS_RANGE);
   return rows
@@ -93,8 +102,9 @@ export async function fetchTransactions(accessToken, spreadsheetId = BUDGET_SPRE
       category: row[4] || 'other',
       notes: row[5] || '',
       emailId: row[6] || '',
+      hidden: row[7] === true,
     }))
-    .filter((t) => t.date && t.merchant);
+    .filter((t) => t.date && t.merchant && !t.hidden);
 }
 
 // Category lives in column E of Transactions.

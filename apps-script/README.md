@@ -409,6 +409,16 @@ balance on the Budget page dropping by $120. If something bought with fun
 money gets returned, email something like "Beryl returned the shoes for
 $120" (action `fun_return`) to credit it back — same pipeline, opposite sign.
 
+For hiding a surprise transaction (e.g. a gift): email something like "hide
+my last transaction" or "hide the $45 Target charge" (action
+`hide_transaction`) right after the card alert lands. It sets column H
+(Hidden) to `TRUE` on the matched Transactions row — the Budget page filters
+hidden rows out entirely (not just from the itemized list; they don't count
+toward any total, category breakdown, or chart either), so check the
+"Transactions" tab directly to confirm a row got hidden rather than looking
+at the app. There's no in-app undo — fix a wrong hide by clearing that row's
+Hidden checkbox directly in the sheet.
+
 For Amazon itemization: once an order email lands labeled "Amazon Orders",
 run `processAmazonOrderEmails` manually (or wait for its trigger) and check
 that the matching Transactions row's Category changed and its Notes now

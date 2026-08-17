@@ -276,7 +276,61 @@ function applyAction_(result) {
     appendFunMoneyEntry_(result.list, 'spend', -Math.abs(result.amount), result.title);
   } else if (result.action === 'fun_return') {
     appendFunMoneyEntry_(result.list, 'return', Math.abs(result.amount), result.title);
+  } else if (result.action === 'hide_transaction') {
+    hideTransaction_(result.merchant, result.amount);
   }
+}
+
+// Hides a Transactions row from the Budget page entirely (not just the
+// itemized list -- excluded from every total, category breakdown, and chart
+// too, per Trey's call: a hidden transaction should not show up anywhere on
+// the shared wall display, including as an unexplained bump in a category
+// total). A bare "hide my last transaction" with no further detail hides
+// simply the last row in the sheet -- safe given the short gap between
+// making a purchase and messaging about it (same tradeoff already accepted
+// by fun_spend/fun_return having no per-transaction disambiguation either).
+// If a merchant/amount hint WAS given, it must actually match something --
+// sheet row order is append order, not real-world purchase order (a receipt
+// import or another pipeline can append after a delayed card alert), so
+// falling back to "the last row" when a hint fails to match risks silently
+// hiding the wrong transaction entirely, which happened in testing (asking
+// to hide a vending-machine charge hid an unrelated Costco return instead,
+// because the vending charge's raw merchant text didn't contain the hint
+// and the old fallback grabbed whatever row happened to be last). No match
+// is now a real no-op, logged so it's visible in Executions.
+function hideTransaction_(merchantHint, amountHint) {
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+  const rowIndex = findTransactionToHide_(sheet, merchantHint, amountHint);
+  if (rowIndex === -1) {
+    Logger.log('hide_transaction: no matching row found for merchant=%s amount=%s', merchantHint, amountHint);
+    return;
+  }
+  sheet.getRange(rowIndex, 8).setValue(true); // column H = Hidden
+}
+
+function findTransactionToHide_(sheet, merchantHint, amountHint) {
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return -1;
+
+  if (!merchantHint && typeof amountHint !== 'number') {
+    return data.length; // no hint at all -- just the last row
+  }
+
+  // Raw card-alert merchant text is often cryptic (e.g. "USAT * VENDING"),
+  // so a hint like "vending machine" is matched word-by-word rather than as
+  // one exact phrase -- any hint word appearing in the row's merchant text
+  // counts as a match.
+  const normalizedMerchant = (merchantHint || '').toLowerCase().trim();
+  const hintWords = normalizedMerchant.split(/\s+/).filter((w) => w.length > 2);
+  for (let i = data.length - 1; i >= 1; i--) {
+    const rowMerchant = String(data[i][2] || '').toLowerCase();
+    const rowAmount = Number(data[i][3]);
+    const merchantMatches = hintWords.some((w) => rowMerchant.indexOf(w) !== -1);
+    const amountMatches = typeof amountHint === 'number' && Math.abs(Math.abs(rowAmount) - amountHint) <= 0.01;
+    if (merchantMatches || amountMatches) return i + 1;
+  }
+  return -1; // a hint was given but nothing matched -- don't guess
 }
 
 // amount is always signed correctly here (negative for spend, positive for
@@ -1191,8 +1245,13 @@ function getOrCreateTransactionsSheet_(spreadsheet) {
     const isFresh = spreadsheet.getSheets().length === 1 && !spreadsheet.getSheetByName(TRANSACTIONS_TAB);
     sheet = isFresh ? spreadsheet.getSheets()[0] : spreadsheet.insertSheet();
     sheet.setName(TRANSACTIONS_TAB);
-    sheet.appendRow(['Date', 'Card', 'Merchant', 'Amount', 'Category', 'Notes', 'EmailId']);
+    sheet.appendRow(['Date', 'Card', 'Merchant', 'Amount', 'Category', 'Notes', 'EmailId', 'Hidden']);
     sheet.setFrozenRows(1);
+  } else if (sheet.getLastColumn() < 8) {
+    // Migration for a sheet created before the Hidden column (hide-surprise-
+    // transactions, T-11) existed -- existing rows are left blank in column
+    // H, which reads as "not hidden" everywhere that checks it.
+    sheet.getRange(1, 8).setValue('Hidden');
   }
   return sheet;
 }
@@ -1488,14 +1547,15 @@ const RESPONSE_SCHEMA = {
   items: {
     type: 'OBJECT',
     properties: {
-      action: { type: 'STRING', enum: ['add_task', 'add_event', 'add_grocery', 'fun_spend', 'fun_return', 'unknown'] },
+      action: { type: 'STRING', enum: ['add_task', 'add_event', 'add_grocery', 'fun_spend', 'fun_return', 'hide_transaction', 'unknown'] },
       person: { type: 'STRING', nullable: true },
       list: { type: 'STRING', enum: ['trey', 'beryl', 'kids', 'family'], nullable: true },
       store: { type: 'STRING', enum: ['grocery', 'costco', 'other'], nullable: true },
       title: { type: 'STRING' },
       date: { type: 'STRING', nullable: true, description: 'YYYY-MM-DD' },
       time: { type: 'STRING', nullable: true, description: '24-hour HH:MM, omit for all-day' },
-      amount: { type: 'NUMBER', nullable: true, description: 'Positive dollar amount, only used for fun_spend/fun_return' },
+      amount: { type: 'NUMBER', nullable: true, description: 'Positive dollar amount, for fun_spend/fun_return, or an amount hint for hide_transaction' },
+      merchant: { type: 'STRING', nullable: true, description: 'Merchant name hint, only used for hide_transaction, if one was mentioned' },
       notes: { type: 'STRING', nullable: true },
     },
     required: ['action', 'title'],
@@ -1543,6 +1603,7 @@ function buildPrompt_(text, today) {
     '- action "add_grocery": an item to buy. "store" is grocery (default), costco, or other, based on context; default to "grocery" if unclear.',
     '- action "fun_spend": a message reporting that Trey or Beryl spent their personal fun-money on something, e.g. "Beryl spent $120 on shoes" or "I spent 40 bucks on a movie" (from Trey). Set "list" to trey or beryl, whichever person spent it, "amount" to the dollar figure, and "title" to a short description of the purchase.',
     '- action "fun_return": a message reporting that a fun-money purchase was returned or refunded, e.g. "Beryl returned the shoes for $120" or "I got a refund for the movie tickets, $40". Credits the amount back to that person instead of deducting it. Same fields as fun_spend.',
+    '- action "hide_transaction": a request to hide a recent card charge from the shared Budget display, e.g. "hide my last transaction", "hide the Target charge", or "hide the $45 charge at Amazon" -- typically sent right after buying a gift or something else meant to be a surprise. Set "title" to a short description (not otherwise used). If a specific merchant and/or dollar amount was mentioned, set "merchant" and/or "amount" as a hint for finding the right one; if the message just says "last transaction" with no further detail, leave both null.',
     '- action "unknown": the email is not a clear request for any of the above.',
     '- Resolve relative dates such as Thursday or tomorrow against the current date given above.',
     '',
