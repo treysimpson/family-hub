@@ -156,7 +156,31 @@ const MERCHANT_NAMES_TAB = 'Merchant Names';
 // script.
 const ORDER_ITEMS_TAB = 'Order Items';
 
-function processFamilyAgentEmails() {
+// Guards a trigger-invoked function against overlapping runs -- without
+// this, two runs (a 5-minute trigger firing again while the previous run is
+// still mid-flight, or a manual "Run" from the editor overlapping a trigger
+// fire) can both read the same still-labeled thread before either moves it
+// to Done, and both append a row/entry for it. Caught for real: an Amex
+// alert got added to Transactions twice with the same EmailId (2026-08-17).
+// One shared script-wide lock (not a per-function one) is intentional --
+// these functions all read/write the same Budget spreadsheet and Gmail
+// labels, so serializing all of them is simpler and safer than reasoning
+// about which pairs can safely run concurrently, and none of them are slow
+// enough for that serialization to matter. If the lock is already held,
+// this pass is silently skipped -- nothing is lost, the next trigger fire
+// picks up the same still-labeled threads.
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function processFamilyAgentEmails() { withLock_(processFamilyAgentEmails_); }
+function processFamilyAgentEmails_() {
   const inboxLabel = getOrCreateLabel_(LABEL_INBOX);
   const threads = inboxLabel.getThreads();
 
@@ -345,7 +369,8 @@ function appendFunMoneyEntry_(person, type, amount, description) {
 
 // Run manually or via a monthly time-driven trigger (day-of-month timer,
 // day 1) to deposit each person's allowance into their Fun Money pool.
-function addMonthlyFunMoneyAllowance() {
+function addMonthlyFunMoneyAllowance() { withLock_(addMonthlyFunMoneyAllowance_); }
+function addMonthlyFunMoneyAllowance_() {
   Object.entries(FUN_MONEY_MONTHLY_AMOUNT).forEach(([person, amount]) => {
     appendFunMoneyEntry_(person, 'allowance', amount, 'Monthly allowance');
   });
@@ -355,7 +380,8 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function processBudgetEmails() {
+function processBudgetEmails() { withLock_(processBudgetEmails_); }
+function processBudgetEmails_() {
   const inboxLabel = getOrCreateLabel_(BUDGET_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -392,7 +418,8 @@ function processBudgetEmails() {
   });
 }
 
-function processAmazonOrderEmails() {
+function processAmazonOrderEmails() { withLock_(processAmazonOrderEmails_); }
+function processAmazonOrderEmails_() {
   const inboxLabel = getOrCreateLabel_(AMAZON_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -452,7 +479,8 @@ function applyAmazonOrder_(sheet, order) {
   return false;
 }
 
-function processTargetOrderEmails() {
+function processTargetOrderEmails() { withLock_(processTargetOrderEmails_); }
+function processTargetOrderEmails_() {
   const inboxLabel = getOrCreateLabel_(TARGET_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -539,7 +567,8 @@ function applyTargetOrder_(sheet, order, emailId) {
   return true;
 }
 
-function processTargetReceiptImports() {
+function processTargetReceiptImports() { withLock_(processTargetReceiptImports_); }
+function processTargetReceiptImports_() {
   const inboxLabel = getOrCreateLabel_(TARGET_RECEIPT_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -628,7 +657,8 @@ function processTargetReceiptImports() {
 // function (rather than parameterizing one shared function over "Target" vs
 // "Costco") since a future divergence -- e.g. Costco starting to email
 // digital receipts -- would only need one of the two touched.
-function processCostcoReceiptImports() {
+function processCostcoReceiptImports() { withLock_(processCostcoReceiptImports_); }
+function processCostcoReceiptImports_() {
   const inboxLabel = getOrCreateLabel_(COSTCO_RECEIPT_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -749,7 +779,8 @@ function findTransactionRow_(sheet, date, amount) {
   return -1;
 }
 
-function processStatementImports() {
+function processStatementImports() { withLock_(processStatementImports_); }
+function processStatementImports_() {
   const inboxLabel = getOrCreateLabel_(STATEMENT_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
   if (!threads.length) return;
@@ -1381,7 +1412,8 @@ function appendOrderItems_(spreadsheet, emailId, categories) {
 // rows at all, which were already split correctly by the original run.
 // Safe to run more than once (appendOrderItems_ skips emails it has already
 // recorded). Run manually from the editor whenever needed, no trigger.
-function backfillTargetOrderItems() {
+function backfillTargetOrderItems() { withLock_(backfillTargetOrderItems_); }
+function backfillTargetOrderItems_() {
   const doneLabel = getOrCreateLabel_(TARGET_LABEL_DONE);
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   doneLabel.getThreads().forEach((thread) => {
@@ -1397,7 +1429,8 @@ function backfillTargetOrderItems() {
   });
 }
 
-function backfillTargetReceiptItems() {
+function backfillTargetReceiptItems() { withLock_(backfillTargetReceiptItems_); }
+function backfillTargetReceiptItems_() {
   const doneLabel = getOrCreateLabel_(TARGET_RECEIPT_LABEL_DONE);
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   doneLabel.getThreads().forEach((thread) => {
@@ -1418,7 +1451,8 @@ function backfillTargetReceiptItems() {
 }
 
 // Mirrors backfillTargetReceiptItems -- see its comment.
-function backfillCostcoReceiptItems() {
+function backfillCostcoReceiptItems() { withLock_(backfillCostcoReceiptItems_); }
+function backfillCostcoReceiptItems_() {
   const doneLabel = getOrCreateLabel_(COSTCO_RECEIPT_LABEL_DONE);
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   doneLabel.getThreads().forEach((thread) => {
