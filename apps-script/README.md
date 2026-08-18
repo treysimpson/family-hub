@@ -383,6 +383,27 @@ reading).
     updated; this step is purely about the Cloud Console declaration and
     getting a fresh token.)
 
+## Fixed Bills auto-suggest (added 2026-08-17)
+
+The Fixed Bills tab (step 12) drives the Budget page's fixed-vs-discretionary
+spending split, but it's plain user-curated data — nothing writes to it
+automatically on its own. `suggestFixedBills` scans the whole Transactions
+sheet for merchants that look like a recurring fixed bill (any category, not
+just subscriptions/bills-utilities — appears in 3+ distinct months with
+amounts within 25% of each other) and appends any it doesn't already find in
+Fixed Bills. It only ever adds — nothing is removed or re-evaluated once a
+merchant is in the tab, so delete a wrong suggestion directly in the sheet if
+one shows up.
+
+26. **Run it once now**: select `suggestFixedBills` in the function dropdown
+    and Run. Check Executions for the log line listing what it added (or
+    that it added nothing, if you have less than 3 months of history for
+    everything so far).
+27. **Add a monthly trigger** (optional, but Trey wants it): Triggers page →
+    Add Trigger → function `suggestFixedBills` → Time-driven → Month timer →
+    day **1** → Save, so newly-recurring merchants get picked up
+    automatically as more months of history accumulate.
+
 ## Testing
 
 Send (or voice-dictate via Siri/Gemini) an email to simpsonfamilyhubapp@gmail.com, e.g.

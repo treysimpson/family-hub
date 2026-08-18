@@ -1472,6 +1472,69 @@ function backfillCostcoReceiptItems_() {
   });
 }
 
+// Scans the whole Transactions sheet for merchants that look like a
+// recurring fixed bill and adds any new ones to the Fixed Bills tab. Every
+// category is considered (not just "subscriptions"/"bills-utilities") per
+// Trey's call -- catches a fixed bill Gemini miscategorized elsewhere, at
+// the cost of also flagging a merchant he just happens to shop at monthly
+// (e.g. the same gas station); the two thresholds below (3+ distinct
+// months, amounts within 25% of each other) are the guard against that,
+// not a category filter. A merchant only ever gets added, never removed or
+// re-evaluated once it's in Fixed Bills -- this is meant to seed/refresh
+// the list, not replace Trey manually curating it (deleting a wrong
+// suggestion directly in the sheet is the fix, same as everywhere else
+// this doc uses that pattern). Hidden transactions (T-11) are excluded
+// from consideration entirely, same as everywhere else they're excluded --
+// a hidden gift is never going to look "recurring" anyway, but this avoids
+// even trying. Run manually from the editor (function dropdown ->
+// suggestFixedBills -> Run) any time, or add a monthly time-driven trigger
+// to keep it refreshed automatically -- see apps-script/README.md.
+function suggestFixedBills() { withLock_(suggestFixedBills_); }
+function suggestFixedBills_() {
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+  const data = sheet.getDataRange().getValues();
+
+  const merchantGroups = {}; // normalized merchant -> { name, entries: [{date, amount}] }
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][7] === true) continue; // Hidden (column H) -- never a fixed-bill candidate
+    const merchant = String(data[i][2] || '').trim();
+    const date = normalizeSheetDate_(data[i][0]);
+    const amount = Number(data[i][3]);
+    if (!merchant || !date || isNaN(amount)) continue;
+    const key = merchant.toLowerCase();
+    if (!merchantGroups[key]) merchantGroups[key] = { name: merchant, entries: [] };
+    merchantGroups[key].entries.push({ date, amount });
+  }
+
+  const fixedBillsSheet = getOrCreateFixedBillsSheet_(spreadsheet);
+  const existing = new Set(
+    fixedBillsSheet.getDataRange().getValues().slice(1)
+      .map((row) => String(row[0] || '').toLowerCase().trim())
+      .filter(Boolean)
+  );
+
+  const added = [];
+  Object.values(merchantGroups).forEach((group) => {
+    const key = group.name.toLowerCase();
+    if (existing.has(key)) return;
+
+    const months = new Set(group.entries.map((e) => e.date.slice(0, 7))); // "YYYY-MM"
+    if (months.size < 3) return; // needs to recur across at least 3 distinct months
+
+    const amounts = group.entries.map((e) => Math.abs(e.amount));
+    const min = Math.min(...amounts);
+    const max = Math.max(...amounts);
+    if (min <= 0 || (max - min) / min > 0.25) return; // too much amount variance to look fixed
+
+    fixedBillsSheet.appendRow([group.name]);
+    existing.add(key);
+    added.push(group.name + ' (' + months.size + ' months, $' + min.toFixed(2) + '-$' + max.toFixed(2) + ')');
+  });
+
+  Logger.log('suggestFixedBills: added %s candidate(s)%s', added.length, added.length ? ': ' + added.join('; ') : '');
+}
+
 // Run manually once from the Apps Script editor (function dropdown ->
 // setupBudgetSheets -> Run) to create the Budget Targets, Fixed Bills, Fun
 // Money, Merchant Memory, Merchant Names, and Order Items tabs ahead of
