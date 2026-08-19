@@ -793,35 +793,43 @@ function processStatementImports_() {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
-      const pdf = message.getAttachments().find((a) => a.getContentType() === 'application/pdf');
+      const attachments = message.getAttachments().filter(isStatementAttachment_);
 
-      if (!pdf) {
-        moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_REVIEW));
-        return;
-      }
-
-      const transactions = parseStatementWithGemini_(pdf);
-      if (!transactions || !transactions.length) {
+      if (!attachments.length) {
         moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_REVIEW));
         return;
       }
 
       let added = 0;
-      transactions.forEach((t) => {
-        const key = t.date + '|' + t.amount.toFixed(2);
-        if (existingKeys.has(key)) return; // already captured live (or by a previous import) — skip
-        const remembered = lookupMerchantMemory_(spreadsheet, t.merchant);
-        const category = remembered || t.category;
-        const friendlyName = lookupMerchantName_(spreadsheet, t.merchant);
-        const merchant = friendlyName || t.merchant;
-        appendTransactionRow_(sheet, { ...t, merchant, category, notes: 'Statement import' }, message.getId());
-        existingKeys.add(key);
-        added += 1;
+      let parsedCount = 0;
+      attachments.forEach((attachment) => {
+        const transactions = isCsvAttachment_(attachment)
+          ? parseCsvStatementWithGemini_(attachment)
+          : parseStatementWithGemini_(attachment);
+        if (!transactions || !transactions.length) return;
+        parsedCount += transactions.length;
+
+        transactions.forEach((t) => {
+          const key = t.date + '|' + t.amount.toFixed(2);
+          if (existingKeys.has(key)) return; // already captured live (or by a previous import) — skip
+          const remembered = lookupMerchantMemory_(spreadsheet, t.merchant);
+          const category = remembered || t.category;
+          const friendlyName = lookupMerchantName_(spreadsheet, t.merchant);
+          const merchant = friendlyName || t.merchant;
+          appendTransactionRow_(sheet, { ...t, merchant, category, notes: 'Statement import' }, message.getId());
+          existingKeys.add(key);
+          added += 1;
+        });
       });
+
+      if (!parsedCount) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_REVIEW));
+        return;
+      }
 
       Logger.log(
         'Statement import "%s": added %s of %s transactions (rest already existed)',
-        thread.getFirstMessageSubject(), added, transactions.length
+        thread.getFirstMessageSubject(), added, parsedCount
       );
       moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_DONE));
     } catch (err) {
@@ -893,6 +901,73 @@ function parseStatementWithGemini_(pdfBlob) {
             { inline_data: { mime_type: 'application/pdf', data: base64 } },
           ],
         }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: STATEMENT_SCHEMA,
+        },
+      }),
+    }
+  );
+
+  const raw = response.getContentText();
+  const body = JSON.parse(raw);
+  if (body.error) throw new Error('Gemini API error: ' + body.error.message);
+  const jsonText = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text;
+  if (!jsonText) throw new Error('Gemini returned no candidates: ' + raw);
+  return JSON.parse(jsonText);
+}
+
+function isCsvAttachment_(attachment) {
+  const type = attachment.getContentType();
+  return type === 'text/csv' || type === 'application/vnd.ms-excel' || /\.csv$/i.test(attachment.getName() || '');
+}
+
+function isStatementAttachment_(attachment) {
+  return attachment.getContentType() === 'application/pdf' || isCsvAttachment_(attachment);
+}
+
+// A bank CSV export is already structured, so it's sent to Gemini as plain
+// text rather than as a document/image -- no vision guessing needed, just
+// the same categorization judgment call as the PDF path. Chunked so 1-2
+// years of history across multiple accounts doesn't risk truncating a
+// single huge JSON response.
+const CSV_IMPORT_CHUNK_ROWS = 200;
+
+function parseCsvStatementWithGemini_(csvBlob) {
+  const rows = Utilities.parseCsv(csvBlob.getDataAsString());
+  if (rows.length < 2) return [];
+
+  const header = rows[0];
+  const dataRows = rows.slice(1);
+  const transactions = [];
+
+  for (let i = 0; i < dataRows.length; i += CSV_IMPORT_CHUNK_ROWS) {
+    const chunk = dataRows.slice(i, i + CSV_IMPORT_CHUNK_ROWS);
+    const csvText = [header, ...chunk].map((row) => row.join(',')).join('\n');
+    const parsed = callGeminiForStatementCsv_(csvText);
+    if (parsed && parsed.length) transactions.push(...parsed);
+  }
+  return transactions;
+}
+
+function callGeminiForStatementCsv_(csvText) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY script property is not set');
+
+  const prompt = buildStatementPrompt_() +
+    '\n\nYou are given the transactions as CSV text below instead of a PDF (column layout ' +
+    'varies by bank -- infer date/merchant/amount from the header row) covering possibly ' +
+    'several years across one or more accounts. Convert every data row into the same JSON shape.' +
+    '\n\n' + csvText;
+
+  const response = UrlFetchApp.fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: STATEMENT_SCHEMA,
@@ -1306,8 +1381,10 @@ function getOrCreateFixedBillsSheet_(spreadsheet) {
   if (!sheet) {
     sheet = spreadsheet.insertSheet();
     sheet.setName(FIXED_BILLS_TAB);
-    sheet.appendRow(['Merchant']);
+    sheet.appendRow(['Merchant', 'Frequency']);
     sheet.setFrozenRows(1);
+  } else if (!sheet.getRange('B1').getValue()) {
+    sheet.getRange('B1').setValue('Frequency'); // retrofit sheets created before frequency tracking existed
   }
   return sheet;
 }
@@ -1477,9 +1554,19 @@ function backfillCostcoReceiptItems_() {
 // category is considered (not just "subscriptions"/"bills-utilities") per
 // Trey's call -- catches a fixed bill Gemini miscategorized elsewhere, at
 // the cost of also flagging a merchant he just happens to shop at monthly
-// (e.g. the same gas station); the two thresholds below (3+ distinct
-// months, amounts within 25% of each other) are the guard against that,
-// not a category filter. A merchant only ever gets added, never removed or
+// (e.g. the same gas station); the thresholds below (3+ distinct months OR
+// 2+ occurrences ~a year apart, amounts within 25% of each other either
+// way) are the guard against that, not a category filter -- the annual
+// path exists because a once-a-year bill (insurance, Prime, car
+// registration) never hits 3 distinct months no matter how many years of
+// history it has. One more path, deliberately looser (Trey's call,
+// 2026-08-18): a merchant with even a single "subscriptions"-category
+// transaction gets added immediately, trusting Gemini's own category guess
+// (it already recognizes known streaming/software/membership services by
+// name) rather than waiting for the pattern to repeat -- catches a
+// brand-new Netflix-style charge on month one, at the cost of also adding
+// anything Gemini ever mislabels "subscriptions" even once. A merchant only
+// ever gets added, never removed or
 // re-evaluated once it's in Fixed Bills -- this is meant to seed/refresh
 // the list, not replace Trey manually curating it (deleting a wrong
 // suggestion directly in the sheet is the fix, same as everywhere else
@@ -1495,16 +1582,17 @@ function suggestFixedBills_() {
   const sheet = getOrCreateTransactionsSheet_(spreadsheet);
   const data = sheet.getDataRange().getValues();
 
-  const merchantGroups = {}; // normalized merchant -> { name, entries: [{date, amount}] }
+  const merchantGroups = {}; // normalized merchant -> { name, entries: [{date, amount, category}] }
   for (let i = 1; i < data.length; i++) {
     if (data[i][7] === true) continue; // Hidden (column H) -- never a fixed-bill candidate
     const merchant = String(data[i][2] || '').trim();
     const date = normalizeSheetDate_(data[i][0]);
     const amount = Number(data[i][3]);
+    const category = String(data[i][4] || '');
     if (!merchant || !date || isNaN(amount)) continue;
     const key = merchant.toLowerCase();
     if (!merchantGroups[key]) merchantGroups[key] = { name: merchant, entries: [] };
-    merchantGroups[key].entries.push({ date, amount });
+    merchantGroups[key].entries.push({ date, amount, category });
   }
 
   const fixedBillsSheet = getOrCreateFixedBillsSheet_(spreadsheet);
@@ -1519,17 +1607,37 @@ function suggestFixedBills_() {
     const key = group.name.toLowerCase();
     if (existing.has(key)) return;
 
-    const months = new Set(group.entries.map((e) => e.date.slice(0, 7))); // "YYYY-MM"
-    if (months.size < 3) return; // needs to recur across at least 3 distinct months
-
     const amounts = group.entries.map((e) => Math.abs(e.amount));
     const min = Math.min(...amounts);
     const max = Math.max(...amounts);
     if (min <= 0 || (max - min) / min > 0.25) return; // too much amount variance to look fixed
 
-    fixedBillsSheet.appendRow([group.name]);
+    const months = new Set(group.entries.map((e) => e.date.slice(0, 7))); // "YYYY-MM"
+    const isMonthly = months.size >= 3; // recurs across at least 3 distinct months
+
+    // Annual bills (insurance, Prime, car registration) only ever land once
+    // a year, so they never hit 3 distinct months no matter how much history
+    // exists -- caught separately here: 2+ occurrences with every gap
+    // between consecutive dates landing 330-400 days apart (a renewal date
+    // can drift by a few weeks year to year).
+    const sortedDates = group.entries.map((e) => new Date(e.date)).sort((a, b) => a - b);
+    const gapsDays = [];
+    for (let i = 1; i < sortedDates.length; i++) {
+      gapsDays.push((sortedDates[i] - sortedDates[i - 1]) / 86400000);
+    }
+    const isAnnual = gapsDays.length >= 1 && gapsDays.every((g) => g >= 330 && g <= 400);
+
+    // Trust Gemini's own category guess: a single "subscriptions"-tagged
+    // charge is enough, so a brand-new streaming/software/membership
+    // service gets flagged on month one instead of waiting to recur.
+    const isSubscription = group.entries.some((e) => e.category === 'subscriptions');
+
+    if (!isMonthly && !isAnnual && !isSubscription) return;
+
+    const frequency = isMonthly ? 'monthly' : isAnnual ? 'annual' : 'subscription';
+    fixedBillsSheet.appendRow([group.name, frequency]);
     existing.add(key);
-    added.push(group.name + ' (' + months.size + ' months, $' + min.toFixed(2) + '-$' + max.toFixed(2) + ')');
+    added.push(group.name + ' (' + frequency + ', ' + group.entries.length + 'x, $' + min.toFixed(2) + '-$' + max.toFixed(2) + ')');
   });
 
   Logger.log('suggestFixedBills: added %s candidate(s)%s', added.length, added.length ? ': ' + added.join('; ') : '');

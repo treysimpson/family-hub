@@ -152,9 +152,21 @@ both the one-time historical backfill (old statements from before the
 agent existed) and the ongoing monthly reconciliation check (catches any
 month where a card-alert email never arrived) — same operation either way.
 
+**CSV also works** (added 2026-08-18) — most issuers let you export a full
+transaction history as CSV instead of month-by-month PDFs, which is much
+less tedious for a large one-time backfill (e.g. two years across two
+cards). A `.csv` attachment (by content type or `.csv` filename) is sent to
+Gemini as plain text instead of as a document, in chunks of 200 rows so a
+long history doesn't risk truncating a single response — column layout
+doesn't need to match between issuers, Gemini infers date/merchant/amount
+from each file's own header row. Same categorization, same dedupe-by-date-
+and-amount, same output shape either way. An email can attach a PDF, a CSV,
+or several of either — every attachment on the message gets processed, not
+just the first one found.
+
 17. **No filter needed** — this is a manual, infrequent (monthly) action,
     not a recurring sender to watch for. To import a statement: download the
-    PDF from your card issuer's website, email it to yourself as an
+    PDF (or CSV) from your card issuer's website, email it to yourself as an
     attachment (subject doesn't matter), and manually apply the label
     `Statement Import` to that email.
 18. **Add a fourth trigger** (optional — you can also just run it manually
@@ -383,17 +395,36 @@ reading).
     updated; this step is purely about the Cloud Console declaration and
     getting a fresh token.)
 
-## Fixed Bills auto-suggest (added 2026-08-17)
+## Fixed Bills auto-suggest (added 2026-08-17, extended 2026-08-18)
 
 The Fixed Bills tab (step 12) drives the Budget page's fixed-vs-discretionary
 spending split, but it's plain user-curated data — nothing writes to it
 automatically on its own. `suggestFixedBills` scans the whole Transactions
 sheet for merchants that look like a recurring fixed bill (any category, not
-just subscriptions/bills-utilities — appears in 3+ distinct months with
-amounts within 25% of each other) and appends any it doesn't already find in
-Fixed Bills. It only ever adds — nothing is removed or re-evaluated once a
-merchant is in the tab, so delete a wrong suggestion directly in the sheet if
-one shows up.
+just subscriptions/bills-utilities) via three independent tests — a merchant
+only needs to pass one:
+
+- **Monthly** — appears in 3+ distinct months, amounts within 25% of each
+  other.
+- **Annual** (added 2026-08-18) — 2+ occurrences with every gap between them
+  landing 330–400 days apart (a renewal date can drift by a few weeks year
+  to year), amounts within 25%. Exists because a once-a-year bill (car
+  registration, an annual insurance premium, Amazon Prime's yearly plan)
+  never hits 3 distinct months no matter how many years of history exist —
+  with only a 2-year CSV backfill it would show up exactly twice.
+- **Subscription fast path** (added 2026-08-18) — a single transaction
+  already tagged category `subscriptions` by Gemini is enough on its own,
+  trusting Gemini's own recognition of known streaming/software/membership
+  services by name. Catches a brand-new Netflix-style charge the very first
+  month, rather than waiting for it to recur — the tradeoff is that
+  anything Gemini ever mislabels `subscriptions`, even once, gets added too.
+
+Each row added now also records which test matched, in a second **Frequency**
+column (`monthly` / `annual` / `subscription`) — existing sheets get that
+header retrofitted automatically the next time this runs.
+
+It only ever adds — nothing is removed or re-evaluated once a merchant is in
+the tab, so delete a wrong suggestion directly in the sheet if one shows up.
 
 26. **Run it once now**: select `suggestFixedBills` in the function dropdown
     and Run. Check Executions for the log line listing what it added (or
@@ -565,9 +596,9 @@ current category list.
   on the same card land on the same day for the exact same amount, one
   would be silently skipped as a false "already captured" match. Low risk
   in practice, but worth knowing about if a total looks slightly short.
-- Statement import currently only reads the first PDF attachment found on
-  an email — if you attach multiple statement PDFs to one email, only one
-  gets processed. Send them as separate emails for now.
+- Statement import (added 2026-08-18) now reads every PDF/CSV attachment on
+  an email, not just the first — one email with several statement PDFs and
+  CSV exports attached processes all of them.
 - Don't rename "Amazon.com" (or however it appears in your statements) via
   the merchant rename feature — `applyAmazonOrder_` matches Amazon order
   emails to Transactions rows by looking for "amazon" in the merchant text,
@@ -609,6 +640,4 @@ current category list.
 - `findReceiptAttachments_` reads every image/PDF attachment on a message
   (see "Multiple receipts in one email" above), but only same-store batches
   are supported — the first attachment's classification decides which
-  store's prompt the *whole* batch gets parsed with. `processStatementImports`
-  still only reads the first PDF attachment for statement imports (a
-  separate, unrelated limitation — that pipeline was not touched here).
+  store's prompt the *whole* batch gets parsed with.
