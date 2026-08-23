@@ -435,6 +435,58 @@ the tab, so delete a wrong suggestion directly in the sheet if one shows up.
     day **1** → Save, so newly-recurring merchants get picked up
     automatically as more months of history accumulate.
 
+## Work expense import (Payhawk) setup (added 2026-08-22)
+
+Trey's employer (LUMICKS) reimburses work expenses through Payhawk, and he
+pays for them himself on a personal card first — the same cards this whole
+Budget system already tracks. `processWorkExpenseImport` reads a CSV export
+from Payhawk's Statements & Activity → Export screen and cross-references it
+against the Transactions tab so a work expense gets tagged `trey-work`
+(excluded from the regular monthly total, shown as its own "pending
+reimbursement" line — see T-11) automatically, instead of Trey re-tagging
+every one by hand.
+
+Unlike statement import, this does **not** use Gemini — Payhawk's export has
+a small, exact set of column headers (`Expense ID`, `Document Date`, `Total
+Amount (USD)`, `Paid Currency`, `Expense Category`, `Expense Note`) that
+don't vary between exports, so `parsePayhawkCsv_` reads them directly by
+name. If a future Payhawk export ever renames one of those columns, the
+thread goes to Needs Review instead of silently importing garbage.
+
+Matching (`matchWorkExpenses_`) is by date (within 3 days) + amount — exact
+for a USD-paid expense, $5 tolerance for anything paid in another currency,
+since Payhawk's own USD conversion for a foreign-currency charge won't
+necessarily match what the card network actually charged. A matched
+Transactions row gets its category set to `trey-work` and its Notes tagged
+`Work expense #<id>`, so re-running the match (which happens automatically
+after every Payhawk import, and after every new `processBudgetEmails`/
+`processStatementImports` run) never re-tags the same row twice, and two
+different expenses can never both claim the same card charge.
+
+**The `Supplier Name` column in Payhawk's export is not a merchant name** —
+for a personal-funds reimbursement it's populated with the employee's own
+name, not the vendor — so there's no merchant text to cross-check against
+the card's own merchant text. Date + amount is the whole matching key.
+Receipt PDFs (if you export "with receipts") aren't used by this pipeline at
+all — the CSV's own columns are enough for matching; the receipts are only
+useful for your own manual reference.
+
+28. **Export from Payhawk**: web.payhawk.com → Statements & Activity → set
+    the date range you want → Export → CSV (receipts optional, not needed by
+    this pipeline). Email the `Expenses.csv` file to yourself as an
+    attachment and manually apply the label `Work Expense Import` to that
+    email — same manual/infrequent pattern as Statement Import, since this
+    is something Trey runs occasionally, not a recurring sender to watch
+    for.
+29. **Add a fifth trigger** (optional — same reasoning as Statement Import's
+    trigger, step 18): Triggers page → Add Trigger → function
+    `processWorkExpenseImport` → Time-driven → Minutes timer → Every 5
+    minutes → Save.
+30. **Run the match once now** after both this and the card statement
+    backfill (steps 17–19) are done, so the two years of history reconcile
+    against each other: select `matchWorkExpensesNow` in the function
+    dropdown and Run. Check Executions for how many it matched.
+
 ## Testing
 
 Send (or voice-dictate via Siri/Gemini) an email to simpsonfamilyhubapp@gmail.com, e.g.
@@ -610,6 +662,14 @@ current category list.
   will show tax split roughly 90/10 between those two rows, not as a
   separate line. This keeps the rows summing to the real charge without
   adding a 17th category just for tax.
+- Work expense matching (added 2026-08-22) is date + amount only — there is
+  no merchant name to cross-check (see the Work expense import section
+  above), so two genuinely different work expenses landing on the same card
+  on the same day for the same amount could match the wrong Transactions
+  row. Low risk in practice (Trey's call, given the alternative is manually
+  tagging every one), but worth knowing about if a matched row looks wrong —
+  fix it directly in the Transactions sheet, same as any other miscategorized
+  row.
 - `processTargetOrderEmails` matches an order to its card-alert row within
   $5 (`TARGET_ORDER_MATCH_TOLERANCE`), not an exact amount — Target order
   confirmations sometimes quote a bag fee or other adjustment that does not

@@ -119,6 +119,25 @@ const STATEMENT_LABEL_INBOX = 'Statement Import';
 const STATEMENT_LABEL_DONE = 'Statement Import/Done';
 const STATEMENT_LABEL_REVIEW = 'Statement Import/Needs Review';
 
+// ---- Work expense import (Payhawk) ----
+// Manual, occasional (whenever Trey pulls a fresh export from Payhawk, the
+// employer's expense-reimbursement system) -- same shape as Statement
+// Import: email the exported CSV in with this label applied. Unlike
+// statement import, this is parsed directly by column name instead of
+// through Gemini -- Payhawk's export has a small set of exact, known header
+// names (confirmed against a real export 2026-08-22), so a deterministic
+// parse is both cheaper and more reliable than an LLM guess at columns that
+// never actually vary. Rows land in a new Work Expenses tab, then get
+// matched against Transactions by date + amount (see matchWorkExpenses_)
+// the same way every other reconciliation pipeline here works -- a match
+// sets that row's category to "trey-work" and tags Notes with the expense
+// ID, so a matching pass never re-tags the same row twice even if run
+// repeatedly.
+const WORK_EXPENSE_LABEL_INBOX = 'Work Expense Import';
+const WORK_EXPENSE_LABEL_DONE = 'Work Expense Import/Done';
+const WORK_EXPENSE_LABEL_REVIEW = 'Work Expense Import/Needs Review';
+const WORK_EXPENSES_TAB = 'Work Expenses';
+
 // ---- Merchant memory (T-11 Phase D) ----
 // Written from the Hub app when Trey/Beryl manually recategorize a
 // transaction (see src/context/AppContext.jsx recategorizeTransaction).
@@ -388,6 +407,7 @@ function processBudgetEmails_() {
 
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+  let anyAdded = false;
 
   threads.forEach((thread) => {
     try {
@@ -410,12 +430,18 @@ function processBudgetEmails_() {
       if (friendlyName) transaction.merchant = friendlyName;
 
       appendTransactionRow_(sheet, transaction, message.getId());
+      anyAdded = true;
       moveThread_(thread, inboxLabel, getOrCreateLabel_(BUDGET_LABEL_DONE));
     } catch (err) {
       Logger.log('Failed to process budget thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(BUDGET_LABEL_REVIEW));
     }
   });
+
+  // Catches a live card alert for a work expense that was already imported
+  // from Payhawk earlier -- every new Transactions row gets one chance at a
+  // match right away, rather than waiting on the next Payhawk import.
+  if (anyAdded) matchWorkExpenses_(spreadsheet);
 }
 
 function processAmazonOrderEmails() { withLock_(processAmazonOrderEmails_); }
@@ -788,6 +814,7 @@ function processStatementImports_() {
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   const sheet = getOrCreateTransactionsSheet_(spreadsheet);
   const existingKeys = buildExistingTransactionKeys_(sheet);
+  let anyAddedOverall = false;
 
   threads.forEach((thread) => {
     try {
@@ -831,13 +858,210 @@ function processStatementImports_() {
         'Statement import "%s": added %s of %s transactions (rest already existed)',
         thread.getFirstMessageSubject(), added, parsedCount
       );
+      if (added) anyAddedOverall = true;
       moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_DONE));
     } catch (err) {
       Logger.log('Failed to process statement thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(STATEMENT_LABEL_REVIEW));
     }
   });
+
+  // Catches historical work expenses that were already imported from
+  // Payhawk before this statement backfill ran -- every newly-added
+  // Transactions row gets one chance at a match.
+  if (anyAddedOverall) matchWorkExpenses_(spreadsheet);
 }
+
+function processWorkExpenseImport() { withLock_(processWorkExpenseImport_); }
+function processWorkExpenseImport_() {
+  const inboxLabel = getOrCreateLabel_(WORK_EXPENSE_LABEL_INBOX);
+  const threads = inboxLabel.getThreads();
+  if (!threads.length) return;
+
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateWorkExpensesSheet_(spreadsheet);
+  const existingIds = new Set(
+    sheet.getDataRange().getValues().slice(1).map((row) => String(row[0] || '')).filter(Boolean)
+  );
+  let anyImported = false;
+
+  threads.forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const attachments = message.getAttachments().filter(isCsvAttachment_);
+
+      if (!attachments.length) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(WORK_EXPENSE_LABEL_REVIEW));
+        return;
+      }
+
+      let added = 0;
+      let anyUnparseable = false;
+
+      attachments.forEach((attachment) => {
+        const expenses = parsePayhawkCsv_(attachment);
+        if (!expenses) {
+          anyUnparseable = true; // headers didn't match what parsePayhawkCsv_ expects
+          return;
+        }
+        expenses.forEach((e) => {
+          if (existingIds.has(e.id)) return; // already imported (dedupe across re-sent/overlapping exports)
+          sheet.appendRow([e.id, e.date, e.amount, e.currency, e.category, e.note, false]);
+          existingIds.add(e.id);
+          added += 1;
+        });
+      });
+
+      if (anyUnparseable && !added) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(WORK_EXPENSE_LABEL_REVIEW));
+        return;
+      }
+
+      Logger.log('Work expense import "%s": added %s new expense(s)', thread.getFirstMessageSubject(), added);
+      if (added) anyImported = true;
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(anyUnparseable ? WORK_EXPENSE_LABEL_REVIEW : WORK_EXPENSE_LABEL_DONE));
+    } catch (err) {
+      Logger.log('Failed to process work expense thread "%s": %s', thread.getFirstMessageSubject(), err);
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(WORK_EXPENSE_LABEL_REVIEW));
+    }
+  });
+
+  if (anyImported) matchWorkExpenses_(spreadsheet);
+}
+
+// Payhawk's own known export header names -- looked up by name (not fixed
+// position), so a reordered or widened export still parses; only breaks if
+// Payhawk actually renames one of these columns, in which case this returns
+// null so the thread goes to Needs Review instead of silently importing
+// garbage. Utilities.parseCsv (not a naive split(',')) is required here,
+// since free-text columns -- Expense Note especially -- routinely contain
+// embedded commas that a naive split would misparse.
+const PAYHAWK_REQUIRED_COLUMNS = ['Expense ID', 'Document Date', 'Total Amount (USD)', 'Paid Currency', 'Expense Category', 'Expense Note'];
+
+function parsePayhawkCsv_(csvBlob) {
+  // Payhawk's export is UTF-8 with a leading BOM (confirmed against a real
+  // export 2026-08-22) -- getDataAsString() does not strip it, so left
+  // as-is the very first header cell reads "﻿Expense ID" and silently
+  // fails every lookup below. Strip it before parsing.
+  const text = csvBlob.getDataAsString().replace(/^﻿/, '');
+  const rows = Utilities.parseCsv(text);
+  if (rows.length < 2) return null;
+
+  const header = rows[0];
+  const colIndex = {};
+  PAYHAWK_REQUIRED_COLUMNS.forEach((name) => { colIndex[name] = header.indexOf(name); });
+  if (Object.values(colIndex).some((i) => i === -1)) return null;
+
+  return rows.slice(1)
+    .map((row) => ({
+      id: row[colIndex['Expense ID']],
+      date: reformatUsDate_(row[colIndex['Document Date']]),
+      amount: Number(row[colIndex['Total Amount (USD)']]),
+      currency: row[colIndex['Paid Currency']],
+      category: row[colIndex['Expense Category']],
+      note: row[colIndex['Expense Note']],
+    }))
+    .filter((e) => e.id && e.date && !isNaN(e.amount));
+}
+
+// Payhawk's export dates are MM/DD/YYYY -- convert to the same YYYY-MM-DD
+// shape normalizeSheetDate_ uses everywhere else in this sheet, so date-key
+// comparisons in matchWorkExpenses_ don't need a second date format.
+function reformatUsDate_(mmddyyyy) {
+  const parts = String(mmddyyyy || '').split('/');
+  if (parts.length !== 3) return '';
+  const month = parts[0], day = parts[1], year = parts[2];
+  return year + '-' + month.padStart(2, '0') + '-' + day.padStart(2, '0');
+}
+
+// A non-USD expense's "Total Amount (USD)" is Payhawk's own FX conversion
+// at whatever rate/day it booked the expense -- not necessarily what the
+// card network actually charged (different rate, different day, a card
+// foreign-transaction fee Payhawk may not reflect) -- so it needs real
+// slack. A USD expense is the same real dollar amount on both sides, so it
+// should match exactly.
+const WORK_EXPENSE_FX_TOLERANCE = 5;
+
+// A Payhawk expense's Document Date is normally the same day as (or one day
+// off from) the card's own Transaction Date, but the two systems can drift
+// by a couple of days in practice (e.g. a receipt entered a day late) -- a
+// few days' slack avoids losing an otherwise-solid amount match over a date
+// that's merely close, not exact.
+const WORK_EXPENSE_DATE_TOLERANCE_DAYS = 3;
+
+// Scans every not-yet-matched Work Expenses row against Transactions and
+// tags a match's Transactions row as trey-work -- same "tag the row the
+// card alert already created, don't create a new one" approach as
+// applyAmazonOrder_/applyTargetOrder_. Matched on date (within
+// WORK_EXPENSE_DATE_TOLERANCE_DAYS) + amount (exact for USD,
+// WORK_EXPENSE_FX_TOLERANCE otherwise), taking whichever unclaimed
+// Transactions row is the closest amount match rather than just the first
+// candidate, same as applyTargetOrder_. A Transactions row already tagged
+// with a work-expense reference (Notes contains "Work expense #") can never
+// be claimed a second time, so two different real expenses can't collide
+// onto the same card charge. Hidden transactions (T-11) are skipped
+// entirely, same as suggestFixedBills_ -- a hidden row should never
+// resurface anywhere, including here. Safe to call repeatedly: an
+// already-matched Work Expenses row (column G) is skipped outright, and a
+// claimed Transactions row can't be claimed again, so re-running this after
+// a manual correction never re-fights it -- it just doesn't touch that row
+// again at all.
+function matchWorkExpenses_(spreadsheet) {
+  const workSheet = getOrCreateWorkExpensesSheet_(spreadsheet);
+  const workData = workSheet.getDataRange().getValues();
+  if (workData.length < 2) return;
+
+  const txSheet = getOrCreateTransactionsSheet_(spreadsheet);
+  const txData = txSheet.getDataRange().getValues();
+  const claimedRows = new Set();
+  for (let i = 1; i < txData.length; i++) {
+    if (String(txData[i][5] || '').indexOf('Work expense #') !== -1) claimedRows.add(i);
+  }
+
+  let matched = 0;
+  for (let w = 1; w < workData.length; w++) {
+    if (workData[w][6] === true) continue; // already matched
+    const expenseId = workData[w][0];
+    const date = String(workData[w][1] || '');
+    const amount = Number(workData[w][2]);
+    const currency = String(workData[w][3] || 'USD');
+    if (!date || isNaN(amount)) continue;
+    const tolerance = currency === 'USD' ? 0.01 : WORK_EXPENSE_FX_TOLERANCE;
+    const expenseDate = new Date(date);
+
+    let bestRow = -1;
+    let bestDiff = Infinity;
+    for (let t = 1; t < txData.length; t++) {
+      if (claimedRows.has(t)) continue;
+      if (txData[t][7] === true) continue; // Hidden
+      const txDateStr = normalizeSheetDate_(txData[t][0]);
+      if (!txDateStr) continue;
+      const daysApart = Math.abs((new Date(txDateStr) - expenseDate) / 86400000);
+      if (daysApart > WORK_EXPENSE_DATE_TOLERANCE_DAYS) continue;
+      const diff = Math.abs(Number(txData[t][3]) - amount);
+      if (diff > tolerance) continue;
+      if (diff < bestDiff) { bestDiff = diff; bestRow = t; }
+    }
+    if (bestRow === -1) continue;
+
+    const rowIndex = bestRow + 1;
+    const notes = String(txData[bestRow][5] || '');
+    txSheet.getRange(rowIndex, 5).setValue('trey-work');
+    txSheet.getRange(rowIndex, 6).setValue(notes ? notes + '; Work expense #' + expenseId : 'Work expense #' + expenseId);
+    workSheet.getRange(w + 1, 7).setValue(true);
+    claimedRows.add(bestRow);
+    matched += 1;
+  }
+
+  if (matched) Logger.log('matchWorkExpenses_: matched %s work expense(s) to Transactions rows', matched);
+}
+
+// Manual convenience re-run -- not needed for the normal flow (both
+// processWorkExpenseImport and processBudgetEmails/processStatementImports
+// already call matchWorkExpenses_ automatically), but handy any time a
+// fresh pass is wanted, e.g. right after backfilling old statements.
+function matchWorkExpensesNow() { withLock_(function () { matchWorkExpenses_(getOrCreateBudgetSpreadsheet_()); }); }
 
 // Date cells come back as native JS Date objects here (Apps Script's own
 // getValues(), unlike the REST API's UNFORMATTED_VALUE used on the React
@@ -1389,6 +1613,21 @@ function getOrCreateFixedBillsSheet_(spreadsheet) {
   return sheet;
 }
 
+// Written by processWorkExpenseImport_ (one row per Payhawk expense, keyed
+// on Expense ID) and updated in place by matchWorkExpenses_ (column G,
+// Matched, flips to TRUE once that expense is tagged onto a Transactions
+// row) -- never touched by hand.
+function getOrCreateWorkExpensesSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(WORK_EXPENSES_TAB);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet();
+    sheet.setName(WORK_EXPENSES_TAB);
+    sheet.appendRow(['Expense ID', 'Date', 'Amount (USD)', 'Currency', 'Category', 'Note', 'Matched']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 // Written by fun_spend actions (from processFamilyAgentEmails) and by
 // addMonthlyFunMoneyAllowance — not by processBudgetEmails.
 function getOrCreateFunMoneySheet_(spreadsheet) {
@@ -1645,8 +1884,8 @@ function suggestFixedBills_() {
 
 // Run manually once from the Apps Script editor (function dropdown ->
 // setupBudgetSheets -> Run) to create the Budget Targets, Fixed Bills, Fun
-// Money, Merchant Memory, Merchant Names, and Order Items tabs ahead of
-// time, so they are ready without waiting for the next email.
+// Money, Merchant Memory, Merchant Names, Order Items, and Work Expenses
+// tabs ahead of time, so they are ready without waiting for the next email.
 function setupBudgetSheets() {
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   getOrCreateTransactionsSheet_(spreadsheet);
@@ -1656,6 +1895,7 @@ function setupBudgetSheets() {
   getOrCreateMerchantMemorySheet_(spreadsheet);
   getOrCreateMerchantNamesSheet_(spreadsheet);
   getOrCreateOrderItemsSheet_(spreadsheet);
+  getOrCreateWorkExpensesSheet_(spreadsheet);
   Logger.log('Budget sheets ready: ' + spreadsheet.getUrl());
 }
 
