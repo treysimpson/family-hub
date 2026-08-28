@@ -198,7 +198,28 @@ function withLock_(fn) {
   }
 }
 
-function processFamilyAgentEmails() { withLock_(processFamilyAgentEmails_); }
+// Manual kill switch for the 5-minute email pollers other than statement/work-
+// expense import -- lets a large manual backfill (many historical CSVs run
+// through processStatementImports/processWorkExpenseImport by hand) proceed
+// without competing for the shared script lock or Gemini's free-tier quota
+// against the rest of the pipelines. Deliberately does NOT gate
+// processStatementImports/processWorkExpenseImport themselves, since those
+// are exactly what should keep running (manually or via their own trigger)
+// during a pause. Run pauseAgent()/resumeAgent() from the editor's function
+// dropdown.
+function isAgentPaused_() {
+  return PropertiesService.getScriptProperties().getProperty('AGENT_PAUSED') === 'true';
+}
+function pauseAgent() {
+  PropertiesService.getScriptProperties().setProperty('AGENT_PAUSED', 'true');
+  Logger.log('Agent paused -- family agent/budget/amazon/target/costco pollers will no-op until resumeAgent() is run.');
+}
+function resumeAgent() {
+  PropertiesService.getScriptProperties().deleteProperty('AGENT_PAUSED');
+  Logger.log('Agent resumed.');
+}
+
+function processFamilyAgentEmails() { if (isAgentPaused_()) return; withLock_(processFamilyAgentEmails_); }
 function processFamilyAgentEmails_() {
   const inboxLabel = getOrCreateLabel_(LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -399,7 +420,7 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function processBudgetEmails() { withLock_(processBudgetEmails_); }
+function processBudgetEmails() { if (isAgentPaused_()) return; withLock_(processBudgetEmails_); }
 function processBudgetEmails_() {
   const inboxLabel = getOrCreateLabel_(BUDGET_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -444,7 +465,7 @@ function processBudgetEmails_() {
   if (anyAdded) matchWorkExpenses_(spreadsheet);
 }
 
-function processAmazonOrderEmails() { withLock_(processAmazonOrderEmails_); }
+function processAmazonOrderEmails() { if (isAgentPaused_()) return; withLock_(processAmazonOrderEmails_); }
 function processAmazonOrderEmails_() {
   const inboxLabel = getOrCreateLabel_(AMAZON_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -505,7 +526,7 @@ function applyAmazonOrder_(sheet, order) {
   return false;
 }
 
-function processTargetOrderEmails() { withLock_(processTargetOrderEmails_); }
+function processTargetOrderEmails() { if (isAgentPaused_()) return; withLock_(processTargetOrderEmails_); }
 function processTargetOrderEmails_() {
   const inboxLabel = getOrCreateLabel_(TARGET_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -593,7 +614,7 @@ function applyTargetOrder_(sheet, order, emailId) {
   return true;
 }
 
-function processTargetReceiptImports() { withLock_(processTargetReceiptImports_); }
+function processTargetReceiptImports() { if (isAgentPaused_()) return; withLock_(processTargetReceiptImports_); }
 function processTargetReceiptImports_() {
   const inboxLabel = getOrCreateLabel_(TARGET_RECEIPT_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -683,7 +704,7 @@ function processTargetReceiptImports_() {
 // function (rather than parameterizing one shared function over "Target" vs
 // "Costco") since a future divergence -- e.g. Costco starting to email
 // digital receipts -- would only need one of the two touched.
-function processCostcoReceiptImports() { withLock_(processCostcoReceiptImports_); }
+function processCostcoReceiptImports() { if (isAgentPaused_()) return; withLock_(processCostcoReceiptImports_); }
 function processCostcoReceiptImports_() {
   const inboxLabel = getOrCreateLabel_(COSTCO_RECEIPT_LABEL_INBOX);
   const threads = inboxLabel.getThreads();
@@ -816,8 +837,14 @@ function processStatementImports_() {
   const existingKeys = buildExistingTransactionKeys_(sheet);
   let anyAddedOverall = false;
 
-  threads.forEach((thread) => {
+  threads.forEach((thread, threadIndex) => {
     try {
+      // Space out threads too -- several backfill CSVs relabeled and run
+      // together in one execution would otherwise fire back-to-back with no
+      // gap between them, which is its own way to blow the per-minute quota
+      // even with each individual CSV's own chunk pacing in place.
+      if (threadIndex > 0) Utilities.sleep(CSV_CHUNK_DELAY_MS);
+
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
       const attachments = message.getAttachments().filter(isStatementAttachment_);
@@ -829,7 +856,8 @@ function processStatementImports_() {
 
       let added = 0;
       let parsedCount = 0;
-      attachments.forEach((attachment) => {
+      attachments.forEach((attachment, attachmentIndex) => {
+        if (attachmentIndex > 0) Utilities.sleep(CSV_CHUNK_DELAY_MS);
         const transactions = isCsvAttachment_(attachment)
           ? parseCsvStatementWithGemini_(attachment)
           : parseStatementWithGemini_(attachment);
@@ -1157,6 +1185,11 @@ function isStatementAttachment_(attachment) {
 // single huge JSON response.
 const CSV_IMPORT_CHUNK_ROWS = 200;
 
+// Free-tier Gemini quota is 20 requests/minute -- a multi-year CSV backfill
+// can need many chunk calls back to back, so this paces itself under that
+// ceiling (max 15/min) instead of relying on the caller to space things out.
+const CSV_CHUNK_DELAY_MS = 4000;
+
 function parseCsvStatementWithGemini_(csvBlob) {
   const rows = Utilities.parseCsv(csvBlob.getDataAsString());
   if (rows.length < 2) return [];
@@ -1166,6 +1199,7 @@ function parseCsvStatementWithGemini_(csvBlob) {
   const transactions = [];
 
   for (let i = 0; i < dataRows.length; i += CSV_IMPORT_CHUNK_ROWS) {
+    if (i > 0) Utilities.sleep(CSV_CHUNK_DELAY_MS);
     const chunk = dataRows.slice(i, i + CSV_IMPORT_CHUNK_ROWS);
     const csvText = [header, ...chunk].map((row) => row.join(',')).join('\n');
     const parsed = callGeminiForStatementCsv_(csvText);
@@ -1174,7 +1208,15 @@ function parseCsvStatementWithGemini_(csvBlob) {
   return transactions;
 }
 
-function callGeminiForStatementCsv_(csvText) {
+// Retries once or twice on a quota/rate-limit error (with a pause longer than
+// Gemini's own suggested retry-after) before giving up -- otherwise a single
+// transient 429 partway through a long backfill aborts the whole statement
+// thread to Needs Review even though most of its chunks already succeeded.
+const GEMINI_QUOTA_RETRY_LIMIT = 2;
+const GEMINI_QUOTA_RETRY_DELAY_MS = 25000;
+
+function callGeminiForStatementCsv_(csvText, attempt) {
+  attempt = attempt || 1;
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY script property is not set');
 
@@ -1202,7 +1244,15 @@ function callGeminiForStatementCsv_(csvText) {
 
   const raw = response.getContentText();
   const body = JSON.parse(raw);
-  if (body.error) throw new Error('Gemini API error: ' + body.error.message);
+  if (body.error) {
+    const isQuotaError = /quota|RESOURCE_EXHAUSTED/i.test(body.error.message || '');
+    if (isQuotaError && attempt <= GEMINI_QUOTA_RETRY_LIMIT) {
+      Logger.log('Gemini quota hit on CSV chunk (attempt %s) -- waiting %sms and retrying', attempt, GEMINI_QUOTA_RETRY_DELAY_MS);
+      Utilities.sleep(GEMINI_QUOTA_RETRY_DELAY_MS);
+      return callGeminiForStatementCsv_(csvText, attempt + 1);
+    }
+    throw new Error('Gemini API error: ' + body.error.message);
+  }
   const jsonText = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text;
   if (!jsonText) throw new Error('Gemini returned no candidates: ' + raw);
   return JSON.parse(jsonText);

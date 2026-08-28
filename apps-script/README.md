@@ -181,6 +181,27 @@ To import last month's statement right now: download the PDF, email it to
 yourself with the `Statement Import` label applied, then either wait for
 the trigger or run `processStatementImports` manually from the editor.
 
+**A large historical backfill (many CSVs, two years of history) needs extra
+care around Gemini's free-tier quota** (20 requests/minute for
+`gemini-3.6-flash`): a single big CSV alone can need many chunked calls
+(`CSV_IMPORT_CHUNK_ROWS` = 200 rows per call), and `parseCsvStatementWithGemini_`
+now paces its own chunk calls and retries once or twice on a quota error
+before giving up, plus `processStatementImports_` spaces out threads/
+attachments the same way — but running several large CSVs' worth of labeled
+threads in one go can still exceed the quota. To reduce collisions with the
+other pollers while working through a big backfill, run `pauseAgent()` once
+from the editor's function dropdown — this makes `processFamilyAgentEmails`,
+`processBudgetEmails`, `processAmazonOrderEmails`, `processTargetOrderEmails`,
+`processTargetReceiptImports`, and `processCostcoReceiptImports` no-op on
+their next trigger fire (deliberately does not pause
+`processStatementImports`/`processWorkExpenseImport` themselves, since those
+are what you're trying to run). Run `resumeAgent()` when the backfill is
+done. If you still hit a quota error, wait a minute or two, relabel the
+failed thread from `Statement Import/Needs Review` back to `Statement
+Import`, and run `processStatementImports` again — dedupe is by date+amount
+against the Transactions tab, so re-running is always safe and won't create
+duplicate rows.
+
 ## Target order & receipt itemization setup (T-11 Phase E)
 
 Two separate pipelines, both writing genuinely itemized category splits
