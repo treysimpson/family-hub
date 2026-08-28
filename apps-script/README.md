@@ -183,24 +183,33 @@ the trigger or run `processStatementImports` manually from the editor.
 
 **A large historical backfill (many CSVs, two years of history) needs extra
 care around Gemini's free-tier quota** (20 requests/minute for
-`gemini-3.6-flash`): a single big CSV alone can need many chunked calls
-(`CSV_IMPORT_CHUNK_ROWS` = 200 rows per call), and `parseCsvStatementWithGemini_`
-now paces its own chunk calls and retries once or twice on a quota error
-before giving up, plus `processStatementImports_` spaces out threads/
-attachments the same way — but running several large CSVs' worth of labeled
-threads in one go can still exceed the quota. To reduce collisions with the
-other pollers while working through a big backfill, run `pauseAgent()` once
-from the editor's function dropdown — this makes `processFamilyAgentEmails`,
-`processBudgetEmails`, `processAmazonOrderEmails`, `processTargetOrderEmails`,
-`processTargetReceiptImports`, and `processCostcoReceiptImports` no-op on
-their next trigger fire (deliberately does not pause
-`processStatementImports`/`processWorkExpenseImport` themselves, since those
-are what you're trying to run). Run `resumeAgent()` when the backfill is
-done. If you still hit a quota error, wait a minute or two, relabel the
-failed thread from `Statement Import/Needs Review` back to `Statement
-Import`, and run `processStatementImports` again — dedupe is by date+amount
-against the Transactions tab, so re-running is always safe and won't create
-duplicate rows.
+`gemini-3.6-flash`, and it's a rolling window shared across every execution
+that day — not reset per-run). A single big CSV alone can need many chunked
+calls (`CSV_IMPORT_CHUNK_ROWS` = 200 rows per call), and
+`parseCsvStatementWithGemini_` paces its own chunk calls (`CSV_CHUNK_DELAY_MS`,
+currently 7s) and retries on a quota error (`GEMINI_QUOTA_RETRY_DELAY_MS`,
+currently 65s) before giving up, plus `processStatementImports_` spaces out
+threads/attachments the same way — but running several large CSVs' worth of
+labeled threads in one go, especially later in the same day as earlier
+attempts, can still exceed the quota (confirmed happening even with pacing +
+retry during the 2026-08-28 backfill — the 25s delay originally tried there
+was not long enough for the window to clear, hence 65s now). To reduce
+collisions with the other pollers while working through a big backfill, run
+`pauseAgent()` once from the editor's function dropdown — this makes
+`processFamilyAgentEmails`, `processBudgetEmails`, `processAmazonOrderEmails`,
+`processTargetOrderEmails`, `processTargetReceiptImports`, and
+`processCostcoReceiptImports` no-op on their next trigger fire (deliberately
+does not pause `processStatementImports`/`processWorkExpenseImport`
+themselves, since those are what you're trying to run). Run `resumeAgent()`
+when the backfill is done. If you still hit a quota error, wait a few
+minutes, relabel the failed thread from `Statement Import/Needs Review` back
+to `Statement Import`, and run `processStatementImports` again — dedupe is
+by date+amount against the Transactions tab, so re-running is always safe
+and won't create duplicate rows. If the free tier keeps being too tight to
+get through the rest of the backlog, enabling billing on the Gemini API key
+(usage-based, and this workload is cheap at that volume) raises the quota
+well past what this one-time backfill needs — worth considering if pacing
+alone keeps stalling.
 
 ## Target order & receipt itemization setup (T-11 Phase E)
 

@@ -1185,10 +1185,12 @@ function isStatementAttachment_(attachment) {
 // single huge JSON response.
 const CSV_IMPORT_CHUNK_ROWS = 200;
 
-// Free-tier Gemini quota is 20 requests/minute -- a multi-year CSV backfill
-// can need many chunk calls back to back, so this paces itself under that
-// ceiling (max 15/min) instead of relying on the caller to space things out.
-const CSV_CHUNK_DELAY_MS = 4000;
+// Free-tier Gemini quota is 20 requests/minute, but it's a rolling window
+// shared across every execution that day (not reset per-run) -- 4000ms
+// (15/min) still weren't enough headroom during the 2026-08-28 historical
+// backfill once earlier runs/retries had already used part of the window.
+// Widened to leave real margin.
+const CSV_CHUNK_DELAY_MS = 7000;
 
 function parseCsvStatementWithGemini_(csvBlob) {
   const rows = Utilities.parseCsv(csvBlob.getDataAsString());
@@ -1208,12 +1210,15 @@ function parseCsvStatementWithGemini_(csvBlob) {
   return transactions;
 }
 
-// Retries once or twice on a quota/rate-limit error (with a pause longer than
-// Gemini's own suggested retry-after) before giving up -- otherwise a single
-// transient 429 partway through a long backfill aborts the whole statement
-// thread to Needs Review even though most of its chunks already succeeded.
+// Retries once or twice on a quota/rate-limit error before giving up --
+// otherwise a single transient 429 partway through a long backfill aborts
+// the whole statement thread to Needs Review even though most of its chunks
+// already succeeded. 25s (Gemini's own suggested retry-after) was NOT
+// enough in practice on 2026-08-28 -- the same call still hit quota twice
+// more in a row after waiting 25s each time, so this waits a full 65s (more
+// than the 60s rolling window) instead.
 const GEMINI_QUOTA_RETRY_LIMIT = 2;
-const GEMINI_QUOTA_RETRY_DELAY_MS = 25000;
+const GEMINI_QUOTA_RETRY_DELAY_MS = 65000;
 
 function callGeminiForStatementCsv_(csvText, attempt) {
   attempt = attempt || 1;
