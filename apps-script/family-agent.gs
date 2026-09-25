@@ -1972,32 +1972,36 @@ function backfillCostcoReceiptItems_() {
 }
 
 // Scans the whole Transactions sheet for merchants that look like a
-// recurring fixed bill and adds any new ones to the Fixed Bills tab. Every
-// category is considered (not just "subscriptions"/"bills-utilities") per
-// Trey's call -- catches a fixed bill Gemini miscategorized elsewhere, at
-// the cost of also flagging a merchant he just happens to shop at monthly
-// (e.g. the same gas station); the thresholds below (3+ distinct months OR
-// 2+ occurrences ~a year apart, amounts within 25% of each other either
-// way) are the guard against that, not a category filter -- the annual
-// path exists because a once-a-year bill (insurance, Prime, car
-// registration) never hits 3 distinct months no matter how many years of
-// history it has. One more path, deliberately looser (Trey's call,
-// 2026-08-18): a merchant with even a single "subscriptions"-category
-// transaction gets added immediately, trusting Gemini's own category guess
-// (it already recognizes known streaming/software/membership services by
-// name) rather than waiting for the pattern to repeat -- catches a
-// brand-new Netflix-style charge on month one, at the cost of also adding
-// anything Gemini ever mislabels "subscriptions" even once. A merchant only
-// ever gets added, never removed or
-// re-evaluated once it's in Fixed Bills -- this is meant to seed/refresh
-// the list, not replace Trey manually curating it (deleting a wrong
-// suggestion directly in the sheet is the fix, same as everywhere else
-// this doc uses that pattern). Hidden transactions (T-11) are excluded
-// from consideration entirely, same as everywhere else they're excluded --
-// a hidden gift is never going to look "recurring" anyway, but this avoids
-// even trying. Run manually from the editor (function dropdown ->
-// suggestFixedBills -> Run) any time, or add a monthly time-driven trigger
-// to keep it refreshed automatically -- see apps-script/README.md.
+// recurring fixed bill and adds any new ones to the Fixed Bills tab, with
+// the test that matched in column B (monthly / annual / subscription). A
+// merchant passes if any one test holds:
+//   - monthly: 3+ distinct months, amounts within 25% of each other
+//   - annual: 2+ occurrences, every gap 330-400 days, amounts within 25%
+//   - subscription: any transaction tagged "subscriptions" or
+//     "bills-utilities" -- and for those two categories the 25% amount
+//     check is skipped entirely, since real bills drift (Hulu price
+//     increases, a water bill that varies by season, Prime switching
+//     monthly <-> yearly). The first 2026-09-25 run over the 2-year
+//     backfill missed Hulu, YouTube Premium, Amazon Prime and Waste
+//     Management because of that check.
+// Two guards against false positives, both from that same first run:
+//   - Merchants whose every transaction is in an everyday-spending
+//     category (NEVER_FIXED_CATEGORIES) are never suggested -- $20 Starbucks
+//     reloads and a regular $20 gas fill-up repeat exactly, but they're
+//     discretionary, not bills.
+//   - Merchants with no charge in the last 400 days are skipped -- a
+//     cancelled subscription isn't worth adding.
+// A merchant is only ever added, never re-evaluated once it has a row in
+// Fixed Bills -- including a row marked "excluded" (written by the Hub
+// app's "Not a fixed bill" button, or typed into column B by hand), which
+// is how a wrong suggestion stays gone instead of being re-added by the
+// next monthly run. Hidden transactions (T-11) are never considered. Run
+// manually from the editor any time, or via the monthly trigger -- see
+// apps-script/README.md.
+const FIXED_BILL_CATEGORIES = ['subscriptions', 'bills-utilities'];
+const NEVER_FIXED_CATEGORIES = ['dining', 'groceries', 'gas-auto', 'shopping', 'travel', 'one-time', 'trey-work'];
+const FIXED_BILL_MAX_AGE_DAYS = 400;
+
 function suggestFixedBills() { withLock_(suggestFixedBills_); }
 function suggestFixedBills_() {
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
@@ -2023,38 +2027,34 @@ function suggestFixedBills_() {
       .map((row) => String(row[0] || '').toLowerCase().trim())
       .filter(Boolean)
   );
+  const cutoff = Utilities.formatDate(new Date(Date.now() - FIXED_BILL_MAX_AGE_DAYS * 86400000), TIME_ZONE, 'yyyy-MM-dd');
 
   const added = [];
   Object.values(merchantGroups).forEach((group) => {
     const key = group.name.toLowerCase();
     if (existing.has(key)) return;
+    if (group.entries.every((e) => NEVER_FIXED_CATEGORIES.includes(e.category))) return;
+    if (!group.entries.some((e) => e.date >= cutoff)) return; // stopped recurring a long time ago
 
+    const isBillCategory = group.entries.some((e) => FIXED_BILL_CATEGORIES.includes(e.category));
     const amounts = group.entries.map((e) => Math.abs(e.amount));
     const min = Math.min(...amounts);
     const max = Math.max(...amounts);
-    if (min <= 0 || (max - min) / min > 0.25) return; // too much amount variance to look fixed
+    const steadyAmount = min > 0 && (max - min) / min <= 0.25;
+    if (!steadyAmount && !isBillCategory) return; // too much amount variance to look fixed
 
     const months = new Set(group.entries.map((e) => e.date.slice(0, 7))); // "YYYY-MM"
-    const isMonthly = months.size >= 3; // recurs across at least 3 distinct months
+    const isMonthly = steadyAmount && months.size >= 3;
 
-    // Annual bills (insurance, Prime, car registration) only ever land once
-    // a year, so they never hit 3 distinct months no matter how much history
-    // exists -- caught separately here: 2+ occurrences with every gap
-    // between consecutive dates landing 330-400 days apart (a renewal date
-    // can drift by a few weeks year to year).
+    // A renewal date can drift by a few weeks year to year, hence 330-400.
     const sortedDates = group.entries.map((e) => new Date(e.date)).sort((a, b) => a - b);
     const gapsDays = [];
     for (let i = 1; i < sortedDates.length; i++) {
       gapsDays.push((sortedDates[i] - sortedDates[i - 1]) / 86400000);
     }
-    const isAnnual = gapsDays.length >= 1 && gapsDays.every((g) => g >= 330 && g <= 400);
+    const isAnnual = steadyAmount && gapsDays.length >= 1 && gapsDays.every((g) => g >= 330 && g <= 400);
 
-    // Trust Gemini's own category guess: a single "subscriptions"-tagged
-    // charge is enough, so a brand-new streaming/software/membership
-    // service gets flagged on month one instead of waiting to recur.
-    const isSubscription = group.entries.some((e) => e.category === 'subscriptions');
-
-    if (!isMonthly && !isAnnual && !isSubscription) return;
+    if (!isMonthly && !isAnnual && !isBillCategory) return;
 
     const frequency = isMonthly ? 'monthly' : isAnnual ? 'annual' : 'subscription';
     fixedBillsSheet.appendRow([group.name, frequency]);

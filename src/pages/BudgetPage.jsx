@@ -90,7 +90,7 @@ export default function BudgetPage() {
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
-    budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
+    budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError, toggleFixedBill,
     funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   } = useApp();
   const [unlocked, setUnlocked] = useState(false);
@@ -537,7 +537,7 @@ export default function BudgetPage() {
                 ? `${rangeStart} – ${rangeEnd} transactions (${monthTransactions.length} · ${formatCurrency(rangeTotal)})`
                 : `${formatMonthLabel(selectedBudgetMonth)} transactions`}
               {!!selectedTrendCategories.size && ` — ${[...selectedTrendCategories].map(formatCategoryLabel).join(', ')} only`}
-              {' '}(tap merchant to rename, tap elsewhere to recategorize)
+              {' '}(tap merchant to rename, tap elsewhere to recategorize or mark as a fixed bill)
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em' }}>
               <input
@@ -589,6 +589,7 @@ export default function BudgetPage() {
             const items = (orderItemsByEmailId[t.emailId] || []).filter((i) => i.category === t.category);
             const hasDetails = !!items.length;
             const showingDetails = detailsRow === t.row;
+            const isFixedBill = fixedBillMerchants.includes(t.merchant.toLowerCase().trim());
 
             const startRename = (e) => {
               e.stopPropagation();
@@ -645,6 +646,7 @@ export default function BudgetPage() {
                         </button>
                       </span>
                     ) : isEditingCategory ? (
+                      <>
                       <select
                         className="add-input"
                         style={{ fontSize: '1em', padding: '0.1em 0.3em', height: 'auto' }}
@@ -662,8 +664,21 @@ export default function BudgetPage() {
                           </option>
                         ))}
                       </select>
+                      <button
+                        className="add-btn"
+                        style={{ padding: '0.15em 0.5em', fontSize: '0.85em' }}
+                        onClick={(e) => { e.stopPropagation(); toggleFixedBill(t); setEditingRow(null); }}
+                      >
+                        {isFixedBill ? 'Not a fixed bill' : 'Mark fixed bill'}
+                      </button>
+                      </>
                     ) : (
                       <span className="task-tag tag-family">{formatCategoryLabel(t.category)}</span>
+                    )}
+                    {isFixedBill && !isEditingCategory && (
+                      <span className="task-tag" style={{ background: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}>
+                        Fixed
+                      </span>
                     )}
                     {isReturn && (
                       <span className="task-tag" style={{ background: 'var(--ev-coral-bg)', color: 'var(--ev-coral-tx)' }}>

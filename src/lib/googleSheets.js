@@ -20,7 +20,12 @@ export const TRANSACTION_CATEGORIES = [
 // action (not by appendTransactionRow_, which never creates a row pre-hidden).
 const TRANSACTIONS_RANGE = 'Transactions!A2:H';
 const BUDGET_TARGETS_RANGE = 'Budget Targets!A2:B';
-const FIXED_BILLS_RANGE = 'Fixed Bills!A2:A';
+const FIXED_BILLS_RANGE = 'Fixed Bills!A2:B';
+// Column B of Fixed Bills records how a merchant got there (monthly /
+// annual / subscription from the Apps Script's suggestFixedBills, "manual"
+// from the app). "excluded" means "explicitly not a fixed bill" -- the row
+// is kept rather than deleted so suggestFixedBills never re-adds it.
+const FIXED_BILL_EXCLUDED = 'excluded';
 const FUN_MONEY_RANGE = 'Fun Money!A2:E';
 const MERCHANT_MEMORY_RANGE = 'Merchant Memory!A2:B';
 const MERCHANT_NAMES_RANGE = 'Merchant Names!A2:B';
@@ -160,10 +165,19 @@ export async function fetchBudgetTargets(accessToken, spreadsheetId = BUDGET_SPR
 export async function fetchFixedBills(accessToken, spreadsheetId = BUDGET_SPREADSHEET_ID) {
   try {
     const rows = await fetchRange_(accessToken, spreadsheetId, FIXED_BILLS_RANGE);
-    return rows.map((row) => String(row[0] || '').toLowerCase().trim()).filter(Boolean);
+    return rows
+      .filter((row) => String(row[1] || '').toLowerCase().trim() !== FIXED_BILL_EXCLUDED)
+      .map((row) => String(row[0] || '').toLowerCase().trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
+}
+
+// Marks a merchant as a fixed bill ("manual") or explicitly not one
+// ("excluded") -- same upsert-by-merchant as Merchant Memory/Names.
+export async function setFixedBillStatus(accessToken, merchant, isFixed, spreadsheetId = BUDGET_SPREADSHEET_ID) {
+  await upsertKeyValue_(accessToken, spreadsheetId, 'Fixed Bills', FIXED_BILLS_RANGE, merchant, isFixed ? 'manual' : FIXED_BILL_EXCLUDED);
 }
 
 // Item-level detail behind a Target order/receipt split (see the Order

@@ -425,36 +425,33 @@ reading).
     updated; this step is purely about the Cloud Console declaration and
     getting a fresh token.)
 
-## Fixed Bills auto-suggest (added 2026-08-17, extended 2026-08-18)
+## Fixed Bills auto-suggest (added 2026-08-17, reworked 2026-09-25)
 
 The Fixed Bills tab (step 12) drives the Budget page's fixed-vs-discretionary
-spending split, but it's plain user-curated data — nothing writes to it
-automatically on its own. `suggestFixedBills` scans the whole Transactions
-sheet for merchants that look like a recurring fixed bill (any category, not
-just subscriptions/bills-utilities) via three independent tests — a merchant
-only needs to pass one:
+spending split. A merchant counts as fixed when its name matches a row in
+column A exactly (ignoring case). Column B records how it got there:
+`monthly` / `annual` / `subscription` (added by `suggestFixedBills`),
+`manual` (the Hub app's "Mark fixed bill" button), or `excluded`
+(explicitly *not* a fixed bill). An `excluded` row is kept on purpose so
+the monthly `suggestFixedBills` run never re-adds it. To remove a suggestion,
+tap the transaction in the Hub and choose "Not a fixed bill", or type
+`excluded` in column B. Don't delete the row, or it will come back next month.
 
-- **Monthly** — appears in 3+ distinct months, amounts within 25% of each
-  other.
-- **Annual** (added 2026-08-18) — 2+ occurrences with every gap between them
-  landing 330–400 days apart (a renewal date can drift by a few weeks year
-  to year), amounts within 25%. Exists because a once-a-year bill (car
-  registration, an annual insurance premium, Amazon Prime's yearly plan)
-  never hits 3 distinct months no matter how many years of history exist —
-  with only a 2-year CSV backfill it would show up exactly twice.
-- **Subscription fast path** (added 2026-08-18) — a single transaction
-  already tagged category `subscriptions` by Gemini is enough on its own,
-  trusting Gemini's own recognition of known streaming/software/membership
-  services by name. Catches a brand-new Netflix-style charge the very first
-  month, rather than waiting for it to recur — the tradeoff is that
-  anything Gemini ever mislabels `subscriptions`, even once, gets added too.
+`suggestFixedBills` adds a merchant that passes any one of:
 
-Each row added now also records which test matched, in a second **Frequency**
-column (`monthly` / `annual` / `subscription`) — existing sheets get that
-header retrofitted automatically the next time this runs.
+- **Monthly**: 3+ distinct months, amounts within 25% of each other.
+- **Annual**: 2+ occurrences, every gap 330–400 days, amounts within 25%.
+- **Subscription/bill**: any transaction tagged `subscriptions` or
+  `bills-utilities`. The 25% amount check is skipped for these because
+  real bills drift (price increases, seasonal water bills). That check is
+  why the first run over the 2-year backfill missed Hulu, YouTube Premium,
+  Amazon Prime and Waste Management.
 
-It only ever adds — nothing is removed or re-evaluated once a merchant is in
-the tab, so delete a wrong suggestion directly in the sheet if one shows up.
+It never suggests a merchant whose transactions are all everyday spending
+(`dining`, `groceries`, `gas-auto`, `shopping`, `travel`), since $20
+Starbucks reloads and gas fill-ups repeat exactly but aren't bills. It also
+skips anything with no charge in the last 400 days. Hidden transactions are
+never considered.
 
 26. **Run it once now**: select `suggestFixedBills` in the function dropdown
     and Run. Check Executions for the log line listing what it added (or

@@ -10,6 +10,7 @@ import {
 import {
   fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchFunMoney, fetchOrderItems,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
+  setFixedBillStatus,
 } from '../lib/googleSheets';
 import { useAuth } from './AuthContext';
 import {
@@ -267,6 +268,23 @@ export function AppProvider({ children }) {
     }
   }, [accessToken, budgetTransactions]);
 
+  // Flips whether this transaction's merchant counts as a fixed bill (the
+  // Budget page's fixed-vs-discretionary split). Un-marking writes an
+  // "excluded" row rather than deleting, so the Apps Script's monthly
+  // suggestFixedBills run doesn't just add it straight back.
+  const toggleFixedBill = useCallback(async (transaction) => {
+    const key = transaction.merchant.toLowerCase().trim();
+    const wasFixed = fixedBillMerchants.includes(key);
+    setFixedBillMerchants((prev) => (wasFixed ? prev.filter((m) => m !== key) : [...prev, key]));
+    try {
+      await setFixedBillStatus(accessToken, transaction.merchant, !wasFixed);
+      setBudgetActionError(null);
+    } catch (err) {
+      setFixedBillMerchants((prev) => (wasFixed ? [...prev, key] : prev.filter((m) => m !== key)));
+      setBudgetActionError(err.message);
+    }
+  }, [accessToken, fixedBillMerchants]);
+
   const refetchTasks = useCallback(async () => {
     if (!accessToken || !taskListIds) return;
     const all = [];
@@ -481,7 +499,7 @@ export function AppProvider({ children }) {
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
-    funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
+    toggleFixedBill, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
