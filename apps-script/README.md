@@ -517,6 +517,27 @@ useful for your own manual reference.
     against each other: select `matchWorkExpensesNow` in the function
     dropdown and Run. Check Executions for how many it matched.
 
+## Clean import (one-time historical backfill, added 2026-09-25)
+
+The Statement Import path (steps 17–19) sends every CSV chunk through
+Gemini, and the free tier's 20 requests/minute couldn't get through ~4,000
+rows of two years' card history even with `pauseAgent()` and the
+7s/65s pacing. So the backfill CSVs were categorized offline by Claude Code
+instead (same category rules as `buildStatementPrompt_`), into one file with
+exact columns `Date,Card,Merchant,Amount,Category` (positive = purchase;
+Card is a short name: Southwest/Prime/Sapphire/United/Amex).
+`processCleanImport` reads that file directly with no Gemini call, skips
+rows already in Transactions (date + amount, counted so two real identical
+same-day charges both survive), applies Merchant Memory / Merchant Names,
+writes everything in one batch, then runs the Payhawk work-expense match.
+
+31. **Email the clean CSV to yourself** (wdsimpson3@gmail.com, *not*
+    simpsonfamilyhubapp@gmail.com) as an attachment and apply the label
+    `Clean Import`.
+32. **Run `processCleanImport`** from the function dropdown. No trigger
+    needed — this is a one-off. Check Executions for "added N of M rows".
+    Safe to re-run: rows already present are skipped.
+
 ## Testing
 
 Send (or voice-dictate via Siri/Gemini) an email to simpsonfamilyhubapp@gmail.com, e.g.

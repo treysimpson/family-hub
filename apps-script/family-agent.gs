@@ -138,6 +138,21 @@ const WORK_EXPENSE_LABEL_DONE = 'Work Expense Import/Done';
 const WORK_EXPENSE_LABEL_REVIEW = 'Work Expense Import/Needs Review';
 const WORK_EXPENSES_TAB = 'Work Expenses';
 
+// ---- Clean import (one-time historical backfill, 2026-09) ----
+// The Gemini-based Statement Import path above couldn't get through ~4,000
+// rows of 2 years' card history on the free tier (20 req/min) even with
+// pacing/retries. Instead the backfill CSVs were categorized offline (by
+// Claude Code, same category rules as buildStatementPrompt_) into one
+// already-clean CSV with exact columns Date,Card,Merchant,Amount,Category
+// (sheet sign convention: positive = purchase). This path parses that file
+// deterministically -- no Gemini at all -- same shape as Work Expense Import:
+// email the CSV to yourself with this label applied, then run
+// processCleanImport from the editor.
+const CLEAN_IMPORT_LABEL_INBOX = 'Clean Import';
+const CLEAN_IMPORT_LABEL_DONE = 'Clean Import/Done';
+const CLEAN_IMPORT_LABEL_REVIEW = 'Clean Import/Needs Review';
+const CLEAN_IMPORT_HEADER = ['Date', 'Card', 'Merchant', 'Amount', 'Category'];
+
 // ---- Merchant memory (T-11 Phase D) ----
 // Written from the Hub app when Trey/Beryl manually recategorize a
 // transaction (see src/context/AppContext.jsx recategorizeTransaction).
@@ -900,6 +915,113 @@ function processStatementImports_() {
   if (anyAddedOverall) matchWorkExpenses_(spreadsheet);
 }
 
+function processCleanImport() { withLock_(processCleanImport_); }
+function processCleanImport_() {
+  const inboxLabel = getOrCreateLabel_(CLEAN_IMPORT_LABEL_INBOX);
+  const threads = inboxLabel.getThreads();
+  if (!threads.length) {
+    Logger.log('No threads labeled "%s" -- nothing to import.', CLEAN_IMPORT_LABEL_INBOX);
+    return;
+  }
+
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+  const existingCounts = countExistingTransactionKeys_(sheet);
+  // Loaded once up front -- lookupMerchantMemory_/lookupMerchantName_ re-read
+  // their whole tab per call, which is fine for one live alert but far too
+  // slow across thousands of rows inside Apps Script's 6-minute limit.
+  const memory = loadLookupTab_(spreadsheet, MERCHANT_MEMORY_TAB);
+  const names = loadLookupTab_(spreadsheet, MERCHANT_NAMES_TAB);
+  let anyAddedOverall = false;
+
+  threads.forEach((thread) => {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const csvs = message.getAttachments().filter(isCsvAttachment_);
+      if (!csvs.length) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(CLEAN_IMPORT_LABEL_REVIEW));
+        return;
+      }
+
+      const newRows = [];
+      let parsedCount = 0;
+      csvs.forEach((csv) => {
+        const rows = Utilities.parseCsv(csv.getDataAsString());
+        const header = (rows[0] || []).map((h) => String(h).trim());
+        if (CLEAN_IMPORT_HEADER.some((h, i) => header[i] !== h)) {
+          throw new Error('Unexpected header in ' + csv.getName() + ': ' + header.join(','));
+        }
+        // Counted rather than a plain Set: two genuinely separate same-day,
+        // same-amount charges (e.g. two $1.60 vending purchases) are both
+        // real, so a key only counts as "already in the sheet" as many times
+        // as it actually appears there.
+        const seenInFile = new Map();
+        rows.slice(1).forEach((r) => {
+          if (r.length < 5 || !r[0]) return;
+          const date = r[0].trim();
+          const amount = Number(r[3]);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(amount)) throw new Error('Bad row: ' + r.join(','));
+          parsedCount += 1;
+
+          const key = date + '|' + amount.toFixed(2);
+          const n = (seenInFile.get(key) || 0) + 1;
+          seenInFile.set(key, n);
+          if (n <= (existingCounts.get(key) || 0)) return; // already captured live or by an earlier import
+
+          const rawMerchant = r[2].trim();
+          const mkey = rawMerchant.toLowerCase();
+          const category = memory.get(mkey) || r[4].trim() || 'other';
+          const merchant = names.get(mkey) || rawMerchant;
+          newRows.push([date, r[1].trim(), merchant, amount, category, 'Clean import', message.getId(), '']);
+        });
+      });
+
+      if (newRows.length) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+        anyAddedOverall = true;
+      }
+      Logger.log(
+        'Clean import "%s": added %s of %s rows (rest already existed)',
+        thread.getFirstMessageSubject(), newRows.length, parsedCount
+      );
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(CLEAN_IMPORT_LABEL_DONE));
+    } catch (err) {
+      Logger.log('Failed to process clean import thread "%s": %s', thread.getFirstMessageSubject(), err);
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(CLEAN_IMPORT_LABEL_REVIEW));
+    }
+  });
+
+  if (anyAddedOverall) matchWorkExpenses_(spreadsheet);
+}
+
+function countExistingTransactionKeys_(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const counts = new Map();
+  for (let i = 1; i < data.length; i++) {
+    const date = normalizeSheetDate_(data[i][0]);
+    const amount = Number(data[i][3]);
+    if (!date || isNaN(amount)) continue;
+    const key = date + '|' + amount.toFixed(2);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
+// Two-column lookup tab (Merchant Memory / Merchant Names) as a Map keyed on
+// the same lowercased/trimmed text lookupMerchantMemory_ matches on.
+function loadLookupTab_(spreadsheet, tabName) {
+  const map = new Map();
+  const sheet = spreadsheet.getSheetByName(tabName);
+  if (!sheet) return map;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const key = String(data[i][0] || '').toLowerCase().trim();
+    if (key && data[i][1]) map.set(key, data[i][1]);
+  }
+  return map;
+}
+
 function processWorkExpenseImport() { withLock_(processWorkExpenseImport_); }
 function processWorkExpenseImport_() {
   const inboxLabel = getOrCreateLabel_(WORK_EXPENSE_LABEL_INBOX);
@@ -1046,6 +1168,13 @@ function matchWorkExpenses_(spreadsheet) {
   for (let i = 1; i < txData.length; i++) {
     if (String(txData[i][5] || '').indexOf('Work expense #') !== -1) claimedRows.add(i);
   }
+  // Parsed once up front -- re-formatting every row's date inside the
+  // per-expense loop below got slow once the historical backfill put
+  // thousands of rows in Transactions.
+  const txTimes = txData.map((row, i) => {
+    const s = i ? normalizeSheetDate_(row[0]) : '';
+    return s ? new Date(s).getTime() : NaN;
+  });
 
   let matched = 0;
   for (let w = 1; w < workData.length; w++) {
@@ -1063,9 +1192,8 @@ function matchWorkExpenses_(spreadsheet) {
     for (let t = 1; t < txData.length; t++) {
       if (claimedRows.has(t)) continue;
       if (txData[t][7] === true) continue; // Hidden
-      const txDateStr = normalizeSheetDate_(txData[t][0]);
-      if (!txDateStr) continue;
-      const daysApart = Math.abs((new Date(txDateStr) - expenseDate) / 86400000);
+      if (isNaN(txTimes[t])) continue;
+      const daysApart = Math.abs((txTimes[t] - expenseDate) / 86400000);
       if (daysApart > WORK_EXPENSE_DATE_TOLERANCE_DAYS) continue;
       const diff = Math.abs(Number(txData[t][3]) - amount);
       if (diff > tolerance) continue;

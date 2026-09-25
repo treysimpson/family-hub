@@ -35,7 +35,19 @@ Everything is committed and pushed to GitHub — nothing lives only on one PC. T
 
 **Nothing is machine-specific** — no local-only config, no secrets in untracked files, no machine-specific paths in the codebase. The OAuth client ID is public-safe and lives directly in `src/lib/googleAuth.js`. One exception: the Budget PIN lives in browser `localStorage`, not the sheet — a different browser/machine won't have it and will prompt to set a new one the first time Budget is opened there, which is expected, not a bug.
 
-### Right now (as of 2026-08-28)
+### Right now (as of 2026-09-25)
+
+**Gemini backfill abandoned; replaced by a one-time clean import.** The free-tier quota kept stalling even with `pauseAgent()` and the 7s/65s pacing, so the historical card CSVs (in `Downloads\Statement backlogs` on the home PC) were categorized offline by Claude Code into one file, `clean-import.csv`: 3,980 rows, Aug 2024 → Aug 20 2026. Card names: 1608 = Southwest, 2365 = Prime, 8259 = Sapphire, 0715 = United, Amex = Amex. New `processCleanImport` (label `Clean Import`, no Gemini) loads it; see apps-script/README.md steps 31–32. Payments and Amex internal balance adjustments were dropped. Amex perk credits are kept as negative rows in the category they offset. Single shopping/household purchases of $900+ were tagged `one-time`. Obvious work charges (conference/society fees, event catering, FedEx Office poster printing) were tagged `trey-work`. Everything else work-related relies on the Payhawk match.
+
+**Next up, in order**:
+1. Paste the latest `family-agent.gs` into script.google.com.
+2. Remove the `Statement Import` label from any backlog threads (and clear the `Family Agent/Needs Review` CSV threads) so the old Gemini path doesn't retry them. Check for a stray action from the Chase Sapphire email that landed in `Family Agent/Done` (see below).
+3. Email `clean-import.csv` to yourself, label `Clean Import`, run `processCleanImport`.
+4. Payhawk `Expenses.csv` (not on the home PC as of 2026-09-25): export and import under `Work Expense Import`, then run `processWorkExpenseImport` and `matchWorkExpensesNow`. Many United-card flights/hotels are probably work and only get tagged `trey-work` through this match.
+5. `resumeAgent()`. The agent has been paused since 2026-08-28, so about 4 weeks of card-alert emails are queued under `Budget Agent`. They go through Gemini one call each and may take a few trigger runs; anything that fails lands in `Budget Agent/Needs Review` and can be relabeled back. Those alerts also cover the Aug 21 → now gap the CSVs don't.
+6. `suggestFixedBills`, then the Budget Targets tab (T-27's last item).
+
+#### Earlier history (2026-08-28 attempt, kept for context)
 
 **Mid-backfill on a new PC** — the 12 historical card CSVs (pulled earlier via Claude in Chrome, Aug 21 2024–present, see T-28 below) and the Payhawk `Expenses.csv` are being emailed in and processed. `family-agent.gs` has been re-pasted into script.google.com with the pause/quota-pacing fix below.
 
@@ -45,7 +57,7 @@ Everything is committed and pushed to GitHub — nothing lives only on one PC. T
 
 **Gemini free-tier quota (20 req/min for `gemini-3.6-flash`) is the active blocker** — a large multi-year CSV needs many chunked calls (`CSV_IMPORT_CHUNK_ROWS` = 200 rows/call) and the quota is a rolling window shared across every execution that day, not reset per run. Added in commit `39bac5b` (pushed): `pauseAgent()`/`resumeAgent()` to quiet the other 6 pollers during the backfill (does NOT pause `processStatementImports`/`processWorkExpenseImport` — those keep running), plus chunk/attachment/thread pacing and auto-retry-on-quota-error in `parseCsvStatementWithGemini_` and `processStatementImports_`. **First pacing attempt (4s between calls, 25s retry wait) was still not enough** — `amex backlog` and `Amazon card backlog` both hit quota again even through 2 retries. Just widened to 7s between calls and a 65s retry wait (more than the 60-second window) — **this newer version has not been pasted into script.google.com yet**, that's the very next step. `pauseAgent()` was already run before stepping away.
 
-**Next up, in order**:
+**Next steps at the time (superseded by the clean import above)**:
 1. Re-paste the latest `family-agent.gs` (7s/65s pacing) into script.google.com.
 2. Fix the mislabeled threads per item 1 above (move CSV-attachment threads from `Family Agent/Needs Review` to `Statement Import`), check for and clean up the stray action from item 2.
 3. Work through the remaining CSVs (only United and possibly a couple others have actually succeeded so far — check the Transactions tab / Executions log to see what's really landed) — relabel a `Needs Review` thread back to `Statement Import` and run `processStatementImports`, a few at a time, letting the new pacing/retry do its job.
