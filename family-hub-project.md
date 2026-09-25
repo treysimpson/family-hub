@@ -39,31 +39,31 @@ Everything is committed and pushed to GitHub — nothing lives only on one PC. T
 
 **Gemini backfill abandoned; replaced by a one-time clean import.** The free-tier quota kept stalling even with `pauseAgent()` and the 7s/65s pacing, so the historical card CSVs (in `Downloads\Statement backlogs` on the home PC) were categorized offline by Claude Code into one file, `clean-import.csv`: 3,980 rows, Aug 2024 → Aug 20 2026. Card names: 1608 = Southwest, 2365 = Prime, 8259 = Sapphire, 0715 = United, Amex = Amex. New `processCleanImport` (label `Clean Import`, no Gemini) loads it; see apps-script/README.md steps 31–32. Payments and Amex internal balance adjustments were dropped. Amex perk credits are kept as negative rows in the category they offset. Single shopping/household purchases of $900+ were tagged `one-time`. Obvious work charges (conference/society fees, event catering, FedEx Office poster printing) were tagged `trey-work`. Everything else work-related relies on the Payhawk match.
 
+**Done 2026-09-25:** clean import loaded, old Statement Import threads cleared, Payhawk `Expenses.csv` imported and matched, `resumeAgent()` run (agent is live again), first `suggestFixedBills` run. `suggestFixedBills` was then reworked (commit `c16bd6c`), and that version **has been pasted into script.google.com**. It now skips the amount-variance check for `subscriptions`/`bills-utilities`, never suggests purely everyday-spending merchants (dining/groceries/gas-auto/shopping/travel), and skips merchants with no charge in 400 days. The Hub app's Budget page also gained a **Mark fixed bill / Not a fixed bill** button (tap a transaction row), plus a "Fixed" tag on rows that count. Un-marking writes `excluded` in Fixed Bills column B instead of deleting the row, so the monthly suggest run won't re-add it.
+
 **Next up, in order**:
-1. Paste the latest `family-agent.gs` into script.google.com.
-2. Remove the `Statement Import` label from any backlog threads (and clear the `Family Agent/Needs Review` CSV threads) so the old Gemini path doesn't retry them. Check for a stray action from the Chase Sapphire email that landed in `Family Agent/Done` (see below).
-3. Email `clean-import.csv` to yourself, label `Clean Import`, run `processCleanImport`.
-4. Payhawk `Expenses.csv` (not on the home PC as of 2026-09-25): export and import under `Work Expense Import`, then run `processWorkExpenseImport` and `matchWorkExpensesNow`. Many United-card flights/hotels are probably work and only get tagged `trey-work` through this match.
-5. `resumeAgent()`. The agent has been paused since 2026-08-28, so about 4 weeks of card-alert emails are queued under `Budget Agent`. They go through Gemini one call each and may take a few trigger runs; anything that fails lands in `Budget Agent/Needs Review` and can be relabeled back. Those alerts also cover the Aug 21 → now gap the CSVs don't.
-6. `suggestFixedBills`, then the Budget Targets tab (T-27's last item).
+1. **Clean up the false positives the *first* `suggestFixedBills` run added.** The new rules never remove existing rows. For each one, type `excluded` in Fixed Bills column B, or tap one of that merchant's transactions in the Hub → **Not a fixed bill**. **Don't delete rows** (they'd be re-added next month). The first run most likely added these, based on a simulation over the backfill (the live sheet may differ slightly):
+   - Exclude: Starbucks, Standley Shores Shell, Doordash Tacobell, Fuzzys Taco Shop - Westmi, Logan House Coffee, Shake Shack, The Jelly Cafe - Den.
+   - Optional (stopped recurring, harmless either way): Actblue, Billie, Lifestancehealthcolor.
+   - Also check whatever the re-run in step 2 adds for Chase-mislabeled "Bills & Utilities" merchants: Tea Time, Westminster (small parking charges), Wright Brother Nm, Google.
+   - Keep Walmart+ and Amex Walmart+ Credit together (both in or both out) so they net out. Same for Amex Entertainment Credit / Hulu.
+2. **Re-run `suggestFixedBills`** in script.google.com. It should now add Hulu, YouTube Premium, Amazon Prime, Waste Management, City of Westminster, Travelers Per Ins, Guardian Storage, City Park Fitness Center, Card Annual Fee, Audible, LinkedIn Premium and Uber One. Add anything it misses with the in-app **Mark fixed bill** button. Candidates: Riff Music School, Unleashed Brands, SonderMind, and whatever internet now bills as (Xfinity's last card charge was Oct 2025). Live alerts since Aug 21 2026 may name merchants differently (e.g. "Google *HBO Max" vs "HBO Max"). A fixed bill only matches identical merchant text, so rename in the Hub to unify if a bill isn't showing as Fixed.
+3. **Fill in the Budget Targets tab** (T-27's last open item; every category defaults to 0). Monthly averages / medians from the clean import, Aug 2025 – Jul 2026, *before* the Payhawk retagging, so travel is overstated (re-check it in the Hub after the match):
 
-#### Earlier history (2026-08-28 attempt, kept for context)
+   | Category | Avg/mo | Median | | Category | Avg/mo | Median |
+   |---|---|---|---|---|---|---|
+   | groceries | $2,322 | $2,083 | | entertainment | $485 | $342 |
+   | shopping | $1,400 | $1,448 | | healthcare | $437 | $422 |
+   | travel | $1,325 | $1,538 | | subscriptions | $417 | $237 |
+   | dining | $1,201 | $1,262 | | kids-activities | $345 | $305 |
+   | bills-utilities | $845 | $259 | | gas-auto | $249 | $215 |
+   | household | $543 | $552 | | trey-personal | $238 | $129 |
+   | kids-other | $96 | $25 | | beryl-personal | $186 | $188 |
 
-**Mid-backfill on a new PC** — the 12 historical card CSVs (pulled earlier via Claude in Chrome, Aug 21 2024–present, see T-28 below) and the Payhawk `Expenses.csv` are being emailed in and processed. `family-agent.gs` has been re-pasted into script.google.com with the pause/quota-pacing fix below.
+   Total about $10k/mo, excluding one-time and trey-work. Bills-utilities' average is well above its median because of lumpy insurance premiums and one $3,730 City of Westminster charge.
+4. Spot-check a few months in the Hub's Budget tab and fix any wrong categories (tap row → category → **Always for …**, which also writes Merchant Memory). Worth a glance: the `trey-work` rows I tagged by hand (~$43k: conference/society fees, Tacovision/Teleferic/Library Bar/Quad Conf Ctr catering, FedEx Office printing) and the `one-time` rows ($900+ shopping/household: Lovesac, Colorado Service Techs, Uplift Desk, etc.).
 
-**Two real mistakes hit while sending, both understood, first one still needs manual cleanup:**
-1. Most of the 12 card CSVs were emailed **to simpsonfamilyhubapp@gmail.com** instead of **to yourself** — that address auto-labels mail `Family Agent`, and `processFamilyAgentEmails_` only checks attachments for `image/*`/`application/pdf` (not `.csv`), so it fell through to the plain task/event parser, found nothing actionable, and parked most of them under `Family Agent/Needs Review`. The United Chase card CSV was the one exception, sent correctly (self-addressed + manually labeled `Statement Import`). **Fix for any thread still sitting in `Family Agent/Needs Review` with a CSV attachment**: remove that label, add `Statement Import` (or `Work Expense Import` for the Payhawk file specifically — never `Statement Import`, it's a different parser/tab), then run `processStatementImports` (or `processWorkExpenseImport`).
-2. One statement email (Chase Sapphire) landed in `Family Agent/Done` — Gemini apparently found *something* in that email's subject/body it interpreted as a real request (task/event/fun-money/hide-transaction) before the CSV-routing fix existed. Worth a quick check of Google Tasks/Calendar/the Fun Money tab for a stray entry from around that send time and deleting it if found — relabeling the thread won't undo that action.
-
-**Gemini free-tier quota (20 req/min for `gemini-3.6-flash`) is the active blocker** — a large multi-year CSV needs many chunked calls (`CSV_IMPORT_CHUNK_ROWS` = 200 rows/call) and the quota is a rolling window shared across every execution that day, not reset per run. Added in commit `39bac5b` (pushed): `pauseAgent()`/`resumeAgent()` to quiet the other 6 pollers during the backfill (does NOT pause `processStatementImports`/`processWorkExpenseImport` — those keep running), plus chunk/attachment/thread pacing and auto-retry-on-quota-error in `parseCsvStatementWithGemini_` and `processStatementImports_`. **First pacing attempt (4s between calls, 25s retry wait) was still not enough** — `amex backlog` and `Amazon card backlog` both hit quota again even through 2 retries. Just widened to 7s between calls and a 65s retry wait (more than the 60-second window) — **this newer version has not been pasted into script.google.com yet**, that's the very next step. `pauseAgent()` was already run before stepping away.
-
-**Next steps at the time (superseded by the clean import above)**:
-1. Re-paste the latest `family-agent.gs` (7s/65s pacing) into script.google.com.
-2. Fix the mislabeled threads per item 1 above (move CSV-attachment threads from `Family Agent/Needs Review` to `Statement Import`), check for and clean up the stray action from item 2.
-3. Work through the remaining CSVs (only United and possibly a couple others have actually succeeded so far — check the Transactions tab / Executions log to see what's really landed) — relabel a `Needs Review` thread back to `Statement Import` and run `processStatementImports`, a few at a time, letting the new pacing/retry do its job.
-4. Send/process the Payhawk `Expenses.csv` under `Work Expense Import` if not already done, run `processWorkExpenseImport` then `matchWorkExpensesNow` to confirm the match count.
-5. Once everything's in: `resumeAgent()`, then `suggestFixedBills`. T-27's last open item (Budget Targets tab — real monthly numbers) is still outstanding.
-6. If quota keeps stalling even with the wider pacing, enabling billing on the Gemini API key is the real fix (usage-based, cheap at this volume) — worth considering rather than continuing to fight the free-tier ceiling.
+Earlier history of the Gemini backfill attempt (2026-08-28, abandoned) is in git history. See commit `2c3f9df`'s version of this file.
 
 ### External setup verification checklist (T-27, added 2026-08-17)
 
