@@ -435,6 +435,28 @@ function capitalize_(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Pacing for card alerts (reworked 2026-10-10, T-30). After the agent sat
+// paused for 4 weeks, resuming fired one Gemini call per queued alert back
+// to back, the free tier's 20/min quota rejected most of them, and every
+// rejection was parked in Needs Review -- that's the Aug 29 - Sep 24 gap.
+// Now: at most BUDGET_MAX_MESSAGES_PER_RUN alerts per run, spaced out, and a
+// quota error stops the run and leaves the thread where it is so the next
+// 5-minute run picks it up again. A big backlog just drains over an hour or
+// two instead of failing.
+const BUDGET_MAX_MESSAGES_PER_RUN = 12;
+const BUDGET_GEMINI_DELAY_MS = 4000;
+
+// Card-issuer emails that land under the Budget Agent label but aren't
+// purchases. Gemini used to read a Chase "minimum payment due" reminder as a
+// $7,737.64 purchase (the statement balance), so these never reach it.
+const BUDGET_NON_PURCHASE_PATTERN = /minimum payment|payment (is )?due|payment received|statement is (now )?(ready|available)|autopay|security alert|new device|password/i;
+
+// The clean import (statements) covers every card through this date, so an
+// older alert is never added: it would duplicate a statement row. Matters
+// when a stacked Amex thread holds alerts from months back that the old
+// last-message-only code never read.
+const BUDGET_ALERTS_COVERED_THROUGH = new Date('2026-08-21T00:00:00-06:00');
+
 function processBudgetEmails() { if (isAgentPaused_()) return; withLock_(processBudgetEmails_); }
 function processBudgetEmails_() {
   const inboxLabel = getOrCreateLabel_(BUDGET_LABEL_INBOX);
@@ -443,36 +465,64 @@ function processBudgetEmails_() {
 
   const spreadsheet = getOrCreateBudgetSpreadsheet_();
   const sheet = getOrCreateTransactionsSheet_(spreadsheet);
+  // EmailId (column G) of every row already written, so each alert is added
+  // exactly once even though a thread is revisited.
+  const recordedIds = new Set(sheet.getRange(1, 7, sheet.getLastRow(), 1).getValues().map((r) => String(r[0])));
   let anyAdded = false;
+  let geminiCalls = 0;
+  let stopRun = false;
 
-  threads.forEach((thread) => {
-    try {
-      const messages = thread.getMessages();
-      const message = messages[messages.length - 1];
+  for (const thread of threads) {
+    if (stopRun) break;
+    // Every message, not just the last: Amex sends every alert with the same
+    // "Large Purchase Approved" subject, so Gmail stacks them in one thread.
+    const pending = thread.getMessages()
+      .filter((m) => !recordedIds.has(m.getId()) && m.getDate() >= BUDGET_ALERTS_COVERED_THROUGH);
+    let needsReview = false;
+
+    for (const message of pending) {
       const text = `${message.getSubject()}\n\n${message.getPlainBody()}`.trim();
-      const transaction = parseTransactionWithGemini_(text);
-
-      if (!transaction || !transaction.merchant || typeof transaction.amount !== 'number') {
-        moveThread_(thread, inboxLabel, getOrCreateLabel_(BUDGET_LABEL_REVIEW));
-        return;
+      if (BUDGET_NON_PURCHASE_PATTERN.test(message.getSubject() + '\n' + text.slice(0, 600))) {
+        needsReview = true;
+        continue;
       }
+      if (geminiCalls >= BUDGET_MAX_MESSAGES_PER_RUN) { stopRun = true; break; }
+      if (geminiCalls > 0) Utilities.sleep(BUDGET_GEMINI_DELAY_MS);
+      geminiCalls++;
 
-      // A past manual correction for this merchant overrides Gemini's guess.
-      // Category lookup uses the raw merchant text; renaming is applied
-      // after, so a rename never affects its own category memory entry.
-      const remembered = lookupMerchantMemory_(spreadsheet, transaction.merchant);
-      if (remembered) transaction.category = remembered;
-      const friendlyName = lookupMerchantName_(spreadsheet, transaction.merchant);
-      if (friendlyName) transaction.merchant = friendlyName;
+      try {
+        const transaction = parseTransactionWithGemini_(text);
+        if (!transaction || !transaction.merchant || typeof transaction.amount !== 'number') {
+          needsReview = true;
+          continue;
+        }
 
-      appendTransactionRow_(sheet, transaction, message.getId());
-      anyAdded = true;
-      moveThread_(thread, inboxLabel, getOrCreateLabel_(BUDGET_LABEL_DONE));
-    } catch (err) {
-      Logger.log('Failed to process budget thread "%s": %s', thread.getFirstMessageSubject(), err);
-      moveThread_(thread, inboxLabel, getOrCreateLabel_(BUDGET_LABEL_REVIEW));
+        // A past manual correction for this merchant overrides Gemini's guess.
+        // Category lookup uses the raw merchant text; renaming is applied
+        // after, so a rename never affects its own category memory entry.
+        const remembered = lookupMerchantMemory_(spreadsheet, transaction.merchant);
+        if (remembered) transaction.category = remembered;
+        const friendlyName = lookupMerchantName_(spreadsheet, transaction.merchant);
+        if (friendlyName) transaction.merchant = friendlyName;
+
+        appendTransactionRow_(sheet, transaction, message.getId());
+        recordedIds.add(message.getId());
+        anyAdded = true;
+      } catch (err) {
+        if (/quota|RESOURCE_EXHAUSTED|429/i.test(String(err))) {
+          // Leave the thread under Budget Agent; the next run retries it.
+          Logger.log('Gemini quota hit on budget alert -- stopping this run, will retry next run');
+          stopRun = true;
+          break;
+        }
+        Logger.log('Failed to process budget alert "%s": %s', message.getSubject(), err);
+        needsReview = true;
+      }
     }
-  });
+
+    if (stopRun) break;
+    moveThread_(thread, inboxLabel, getOrCreateLabel_(needsReview ? BUDGET_LABEL_REVIEW : BUDGET_LABEL_DONE));
+  }
 
   // Catches a live card alert for a work expense that was already imported
   // from Payhawk earlier -- every new Transactions row gets one chance at a
