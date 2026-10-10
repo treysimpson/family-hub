@@ -266,14 +266,15 @@ app's itemized purchase-history screen, no photo needed.
     Trey's as described for Amazon in step 15 (do not route through
     simpsonfamilyhubapp@gmail.com).
 21. **Add a trigger**: Triggers page → Add Trigger → function
-    `processTargetOrderEmails` → Time-driven → Minutes timer → Every 5
-    minutes → Save.
+    `processTargetOrderEmails` → Time-driven → Minutes timer → Every 15
+    minutes → Save. (15 min since 2026-10-10; these triggers had gone missing
+    from the project and were re-added that day.)
 22. **No filter or label needed for in-store receipts** — email the
     screenshot to simpsonfamilyhubapp@gmail.com like any other family
     request (see above); `processFamilyAgentEmails` handles the routing.
 23. **Add a trigger**: Triggers page → Add Trigger → function
-    `processTargetReceiptImports` → Time-driven → Minutes timer → Every 5
-    minutes → Save.
+    `processTargetReceiptImports` → Time-driven → Hour timer → Every hour
+    → Save. (Hourly since 2026-10-10; receipts only arrive when you send one.)
 
 ## Costco receipt import setup (T-11 Phase E)
 
