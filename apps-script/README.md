@@ -462,6 +462,37 @@ never considered.
     day **1** → Save, so newly-recurring merchants get picked up
     automatically as more months of history accumulate.
 
+## Card Credits (added 2026-10-10)
+
+Some charges are paid back by a card credit, e.g. the Amex Platinum
+Walmart+, Digital Entertainment (Hulu) and Uber One credits. Card alerts
+only report the charge, never the credit, so without this those
+subscriptions would count at full price. The old statement and clean imports
+already have the real credits as negative rows. This only fills the gap for
+charges that arrive through live alerts.
+
+The **Card Credits** tab (created by hand in the sheet, no Apps Script
+needed) holds one row per charge merchant:
+
+| Column | Meaning |
+|---|---|
+| A Charge merchant | The charge's merchant text as it appears in Transactions (case and extra spaces are ignored). Add one row per spelling, e.g. both `WALMART PLUS MONTHLY` (live alert) and `Walmart+` (clean import). |
+| B Credit | Name shown on the credit line, e.g. `Amex Walmart+ Credit`. |
+| C Credit amount | The most the credit covers per charge. Blank means the whole charge. |
+| D Starts | First charge date it applies to. Blank means all. Set to `2026-08-21` (the day after the clean import ends) so old months keep their real credits and aren't credited twice. |
+
+The Hub app adds an italic, teal **"Card credit · expected"** line under
+every covered charge, in the same category as the charge. The charge itself
+gets a tag like *"Amex Walmart+ Credit −$14.08 → you pay $0.00"*. Every
+total, chart and the fixed/discretionary split use the net amount. The
+expected line counts as fixed exactly when its charge does. As a safety
+net, the app skips an expected credit if a real credit row with the same
+amount is already within 10 days of the charge.
+
+To stop a credit (card cancelled, benefit changed), delete its row or set
+its amount. Nothing is written to Transactions, so there's nothing to clean
+up.
+
 ## Work expense import (Payhawk) setup (added 2026-08-22)
 
 Trey's employer (LUMICKS) reimburses work expenses through Payhawk, and he

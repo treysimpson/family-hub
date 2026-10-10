@@ -2,6 +2,7 @@ import { ResponsiveSankey } from '@nivo/sankey';
 import { ResponsivePie } from '@nivo/pie';
 import { ResponsiveLine } from '@nivo/line';
 import { getNivoTheme, colorForCategory, cssVar } from '../lib/chartTheme';
+import { fixedBillKey } from '../lib/cardCredits';
 
 // Must match EXCLUDED_BUDGET_CATEGORIES in AppContext.jsx / EXCLUDED_FROM_BUDGET
 // in apps-script/family-agent.gs — these charts should reflect the same
@@ -27,7 +28,7 @@ function buildSankeyData(monthTransactions, fixedBillMerchants) {
   monthTransactions
     .filter((t) => !EXCLUDED_FROM_CHARTS.includes(t.category))
     .forEach((t) => {
-      const bucket = fixedBillMerchants.includes(t.merchant.toLowerCase()) ? fixedByCategory : discretionaryByCategory;
+      const bucket = fixedBillMerchants.includes(fixedBillKey(t)) ? fixedByCategory : discretionaryByCategory;
       bucket[t.category] = (bucket[t.category] || 0) + t.amount;
     });
 

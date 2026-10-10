@@ -26,6 +26,11 @@ const FIXED_BILLS_RANGE = 'Fixed Bills!A2:B';
 // from the app). "excluded" means "explicitly not a fixed bill" -- the row
 // is kept rather than deleted so suggestFixedBills never re-adds it.
 const FIXED_BILL_EXCLUDED = 'excluded';
+// Card Credits: A = the charge's merchant text (ignoring case and extra
+// spaces), B = the credit's name, C = the most it covers per charge (blank =
+// the whole charge), D = first charge date it applies to (blank = all). See
+// applyCardCredits in cardCredits.js.
+const CARD_CREDITS_RANGE = 'Card Credits!A2:D';
 const FUN_MONEY_RANGE = 'Fun Money!A2:E';
 const MERCHANT_MEMORY_RANGE = 'Merchant Memory!A2:B';
 const MERCHANT_NAMES_RANGE = 'Merchant Names!A2:B';
@@ -144,7 +149,7 @@ export async function upsertMerchantName(accessToken, merchant, displayName, spr
   await upsertKeyValue_(accessToken, spreadsheetId, 'Merchant Names', MERCHANT_NAMES_RANGE, merchant, displayName);
 }
 
-// Budget Targets and Fixed Bills are user-curated reference tabs (see
+// Budget Targets, Fixed Bills and Card Credits are user-curated reference tabs (see
 // setupBudgetSheets in the Apps Script) — they may not exist yet if that
 // hasn't been run, so these resolve to empty rather than throwing, since
 // their absence shouldn't break the rest of the Budget page.
@@ -169,6 +174,22 @@ export async function fetchFixedBills(accessToken, spreadsheetId = BUDGET_SPREAD
       .filter((row) => String(row[1] || '').toLowerCase().trim() !== FIXED_BILL_EXCLUDED)
       .map((row) => String(row[0] || '').toLowerCase().trim())
       .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchCardCredits(accessToken, spreadsheetId = BUDGET_SPREADSHEET_ID) {
+  try {
+    const rows = await fetchRange_(accessToken, spreadsheetId, CARD_CREDITS_RANGE);
+    return rows
+      .map((row) => ({
+        merchant: String(row[0] || '').trim(),
+        creditName: String(row[1] || '').trim() || 'Card credit',
+        amount: Math.abs(Number(row[2]) || 0),
+        startsOn: normalizeDate(row[3]),
+      }))
+      .filter((r) => r.merchant);
   } catch {
     return [];
   }

@@ -6,6 +6,7 @@ import PinGate from '../components/PinGate';
 import CategoryTrendChart from '../components/CategoryTrendChart';
 import BudgetCharts from '../components/BudgetCharts';
 import HowToPanel from '../components/panels/HowToPanel';
+import { fixedBillKey } from '../lib/cardCredits';
 
 function formatCurrency(amount) {
   return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -77,6 +78,12 @@ function isItemizedTransaction(t) {
 // those are plain SUMs over signed amounts.
 function isReturnTransaction(t) {
   return (t.notes || '').toLowerCase().includes('return');
+}
+
+// A real statement credit row (from the old statement/clean imports), as
+// opposed to an expected one added by applyCardCredits.
+function isRealCardCredit(t) {
+  return !t.isExpectedCredit && t.amount < 0 && /credit/i.test(t.merchant);
 }
 
 // Flat $25 warning line rather than a percentage — both pools are $250/mo
@@ -173,6 +180,11 @@ export default function BudgetPage() {
     : searchedTransactions;
   const monthTransactions = [...filteredTransactions].sort((a, b) => (a.date < b.date ? 1 : -1));
   const rangeTotal = isRangeActive ? monthTransactions.reduce((sum, t) => sum + t.amount, 0) : null;
+  // Charge row -> the expected credit that covers it, so the charge can
+  // show what it really costs.
+  const expectedCreditByChargeRow = new Map(
+    budgetTransactions.filter((t) => t.isExpectedCredit).map((t) => [t.creditForRow, t]),
+  );
 
   const categoryRows = Object.entries(budgetCategoryTotals).sort((a, b) => b[1] - a[1]);
   const yearCategoryRows = Object.entries(yearCategoryTotals).sort((a, b) => b[1] - a[1]);
@@ -589,7 +601,36 @@ export default function BudgetPage() {
             const items = (orderItemsByEmailId[t.emailId] || []).filter((i) => i.category === t.category);
             const hasDetails = !!items.length;
             const showingDetails = detailsRow === t.row;
-            const isFixedBill = fixedBillMerchants.includes(t.merchant.toLowerCase().trim());
+            const isFixedBill = fixedBillMerchants.includes(fixedBillKey(t));
+            const isExpectedCredit = !!t.isExpectedCredit;
+            const coveringCredit = expectedCreditByChargeRow.get(t.row);
+
+            if (isExpectedCredit) {
+              // Not a sheet row, so there's nothing to rename, recategorize or
+              // mark -- it follows its charge. Edit the Card Credits tab to
+              // change or remove it.
+              return (
+                <div key={t.row} className="task-item" style={{ opacity: 0.85 }}>
+                  <div>
+                    <div className="task-text" style={{ fontStyle: 'italic' }}>{t.merchant}</div>
+                    <div className="task-meta">
+                      <span className="task-due">{t.date} · covers {t.creditForMerchant}</span>
+                      <span className="task-tag" style={{ background: 'var(--ev-teal-bg)', color: 'var(--ev-teal-tx)' }}>
+                        Card credit · expected
+                      </span>
+                      {isFixedBill && (
+                        <span className="task-tag" style={{ background: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}>
+                          Fixed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)', color: 'var(--ev-teal-tx)', fontStyle: 'italic' }}>
+                    {formatCurrency(t.amount)}
+                  </div>
+                </div>
+              );
+            }
 
             const startRename = (e) => {
               e.stopPropagation();
@@ -683,6 +724,16 @@ export default function BudgetPage() {
                     {isReturn && (
                       <span className="task-tag" style={{ background: 'var(--ev-coral-bg)', color: 'var(--ev-coral-tx)' }}>
                         ↩ Return
+                      </span>
+                    )}
+                    {coveringCredit && (
+                      <span className="task-tag" style={{ background: 'var(--ev-teal-bg)', color: 'var(--ev-teal-tx)' }}>
+                        {coveringCredit.merchant} {formatCurrency(coveringCredit.amount)} → you pay {formatCurrency(t.amount + coveringCredit.amount)}
+                      </span>
+                    )}
+                    {isRealCardCredit(t) && (
+                      <span className="task-tag" style={{ background: 'var(--ev-teal-bg)', color: 'var(--ev-teal-tx)' }}>
+                        Card credit
                       </span>
                     )}
                     {hasDetails && (

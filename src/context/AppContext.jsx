@@ -8,10 +8,11 @@ import {
   insertTask, setTaskStatus, deleteTask, clearCompletedTasks, pruneStaleCompleted,
 } from '../lib/googleTasks';
 import {
-  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchFunMoney, fetchOrderItems,
+  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits, fetchFunMoney, fetchOrderItems,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
   setFixedBillStatus,
 } from '../lib/googleSheets';
+import { applyCardCredits, fixedBillKey } from '../lib/cardCredits';
 import { useAuth } from './AuthContext';
 import {
   monthGrid as mockMonthGrid, weekDays as mockWeekDays, next5Days as mockNext5Days,
@@ -67,6 +68,7 @@ export function AppProvider({ children }) {
   const [budgetActionError, setBudgetActionError] = useState(null);
   const [budgetTargets, setBudgetTargets] = useState({});
   const [fixedBillMerchants, setFixedBillMerchants] = useState([]);
+  const [cardCreditRules, setCardCreditRules] = useState([]);
   // "YYYY-MM" of the calendar month currently shown on the Budget page —
   // fixed, navigable boundaries rather than an implicit "always whatever
   // now is" window. Fun Money is intentionally not scoped to this; it's a
@@ -155,6 +157,7 @@ export function AppProvider({ children }) {
       // never surfaced as a hard error (see fetchBudgetTargets/fetchFixedBills).
       fetchBudgetTargets(accessToken).then((data) => { if (!cancelled) setBudgetTargets(data); });
       fetchFixedBills(accessToken).then((data) => { if (!cancelled) setFixedBillMerchants(data); });
+      fetchCardCredits(accessToken).then((data) => { if (!cancelled) setCardCreditRules(data); });
       fetchFunMoney(accessToken).then((data) => { if (!cancelled) setFunMoneyEntries(data); });
       fetchOrderItems(accessToken).then((data) => { if (!cancelled) setOrderItems(data); });
     };
@@ -350,12 +353,22 @@ export function AppProvider({ children }) {
 
   const budgetLive = isSignedIn && !!budgetTransactions;
 
+  // The sheet's transactions plus an "expected credit" row for every charge
+  // a Card Credits rule covers (see cardCredits.js). Everything below and
+  // every consumer of the context reads this, so totals, charts and the
+  // fixed split all net credits out. The edit actions above keep working
+  // on the raw sheet rows; expected-credit rows are never editable.
+  const budgetTransactionsWithCredits = useMemo(
+    () => (budgetTransactions ? applyCardCredits(budgetTransactions, cardCreditRules) : null),
+    [budgetTransactions, cardCreditRules],
+  );
+
   // All transactions dated within selectedBudgetMonth (a fixed "YYYY-MM"
   // calendar-month boundary, not a rolling window anchored to today).
   const selectedMonthTransactions = useMemo(() => {
-    if (!budgetTransactions) return [];
-    return budgetTransactions.filter((t) => t.date.startsWith(selectedBudgetMonth));
-  }, [budgetTransactions, selectedBudgetMonth]);
+    if (!budgetTransactionsWithCredits) return [];
+    return budgetTransactionsWithCredits.filter((t) => t.date.startsWith(selectedBudgetMonth));
+  }, [budgetTransactionsWithCredits, selectedBudgetMonth]);
 
   const budgetMonthTotal = useMemo(() => {
     if (!budgetTransactions) return null;
@@ -389,7 +402,7 @@ export function AppProvider({ children }) {
   const budgetFixedTotal = useMemo(() => {
     if (!fixedBillMerchants.length) return 0;
     return selectedMonthTransactions
-      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category) && fixedBillMerchants.includes(t.merchant.toLowerCase()))
+      .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category) && fixedBillMerchants.includes(fixedBillKey(t)))
       .reduce((sum, t) => sum + t.amount, 0);
   }, [selectedMonthTransactions, fixedBillMerchants]);
 
@@ -400,9 +413,9 @@ export function AppProvider({ children }) {
   // month. Useful once a full year of statement history exists (backfilled
   // via processStatementImports) for actually setting next year's targets.
   const selectedYearTransactions = useMemo(() => {
-    if (!budgetTransactions) return [];
-    return budgetTransactions.filter((t) => t.date.startsWith(String(selectedBudgetYear)));
-  }, [budgetTransactions, selectedBudgetYear]);
+    if (!budgetTransactionsWithCredits) return [];
+    return budgetTransactionsWithCredits.filter((t) => t.date.startsWith(String(selectedBudgetYear)));
+  }, [budgetTransactionsWithCredits, selectedBudgetYear]);
 
   const yearCategoryTotals = useMemo(() => {
     const totals = {};
@@ -494,7 +507,7 @@ export function AppProvider({ children }) {
     calendarViews, calendarError,
     tasksLive, personTasks, groceryTasks, tasksError,
     toggleTaskLive, addTaskLive, deleteTaskLive, clearCheckedLive, refetchTasks,
-    budgetLive, budgetTransactions, budgetMonthTotal, budgetError,
+    budgetLive, budgetTransactions: budgetTransactionsWithCredits, budgetMonthTotal, budgetError,
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
