@@ -172,7 +172,8 @@ just the first one found.
 18. **Add a fourth trigger** (optional — you can also just run it manually
     right after uploading a statement, since it's infrequent): Triggers page
     → Add Trigger → function `processStatementImports` → Time-driven →
-    Minutes timer → Every 5 minutes → Save.
+    Hour timer → Every hour → Save. (Hourly since 2026-10-10 to save daily
+    script runtime; it only does anything when you email a statement in.)
 19. **Re-run for permissions**: if this is the first time the script reads
     an email attachment, select `processStatementImports` in the function
     dropdown and Run once — approve any new permission prompt.
@@ -288,8 +289,8 @@ BATH TISSU") instead of Target's department-labeled purchase history.
      `processFamilyAgentEmails`/`routeReceiptImage_` recognizes it as Costco
      and routes it to the `Costco Receipt` label automatically.
 23b. **Add a trigger**: Triggers page → Add Trigger → function
-     `processCostcoReceiptImports` → Time-driven → Minutes timer → Every 5
-     minutes → Save.
+     `processCostcoReceiptImports` → Time-driven → Hour timer → Every hour
+     → Save. (Hourly since 2026-10-10; receipts only arrive when you send one.)
 
 Testing: email a photo of a Costco receipt to simpsonfamilyhubapp@gmail.com,
 confirm the thread moves to the `Costco Receipt` label (classification
@@ -538,12 +539,15 @@ useful for your own manual reference.
     for.
 29. **Add a fifth trigger** (optional — same reasoning as Statement Import's
     trigger, step 18): Triggers page → Add Trigger → function
-    `processWorkExpenseImport` → Time-driven → Minutes timer → Every 5
-    minutes → Save.
+    `processWorkExpenseImport` → Time-driven → Hour timer → Every hour
+    → Save. (Hourly since 2026-10-10.)
 30. **Run the match once now** after both this and the card statement
     backfill (steps 17–19) are done, so the two years of history reconcile
     against each other: select `matchWorkExpensesNow` in the function
-    dropdown and Run. Check Executions for how many it matched.
+    dropdown and Run. Check Executions for how many it matched. Don't give
+    `matchWorkExpensesNow` its own trigger: imports and new card alerts
+    already run the match. A 5-minute trigger on it was removed 2026-10-10
+    because it used a large share of the daily script runtime.
 
 ## Clean import (one-time historical backfill, added 2026-09-25)
 
