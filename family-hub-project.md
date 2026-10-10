@@ -46,19 +46,41 @@ Everything is committed and pushed to GitHub — nothing lives only on one PC. T
    - Leftovers (Google, Chase, Colorado Service Techs, Billie, Lifestancehealthcolor) moved to **T-29** in the to-do list.
    - Amex credits are now handled by the new **Card Credits** tab (see apps-script/README.md, "Card Credits"). It has rows for Walmart+, Hulu and Uber One. Add a row if another credit-covered charge shows up at full price.
 2. **[DONE 2026-10-10: all 12 below are in Fixed Bills]** **Re-run `suggestFixedBills`** in script.google.com. It should now add Hulu, YouTube Premium, Amazon Prime, Waste Management, City of Westminster, Travelers Per Ins, Guardian Storage, City Park Fitness Center, Card Annual Fee, Audible, LinkedIn Premium and Uber One. Add anything it misses with the in-app **Mark fixed bill** button. Candidates: Riff Music School, Unleashed Brands, SonderMind, and whatever internet now bills as (Xfinity's last card charge was Oct 2025). Live alerts since Aug 21 2026 may name merchants differently (e.g. "Google *HBO Max" vs "HBO Max"). A fixed bill only matches identical merchant text, so rename in the Hub to unify if a bill isn't showing as Fixed.
-3. **Fill in the Budget Targets tab** (T-27's last open item; every category defaults to 0). Monthly averages / medians from the clean import, Aug 2025 – Jul 2026, *before* the Payhawk retagging, so travel is overstated (re-check it in the Hub after the match):
+3. **Budget Targets: draft ready 2026-10-10, waiting on Trey's OK before it's entered.** Built from the live Transactions sheet (after the Payhawk match and recategorizations), using the last 12 complete statement-backed months, Aug 2025 – Jul 2026. One-time and trey-work are excluded, as always. Method: start from each category's **median** month (a typical month, not skewed by one big charge), round to a clean number, and nudge for trend.
+   - **New category `annual-bills`** (code done, not yet live): once-a-year bills (Travelers home/auto premium, card annual fees $695 + $895, Costco/annual memberships, yearly apps). This is the "non-monthly" bucket Monarch and YNAB use. Without it, bills-utilities and subscriptions swing from about $250 to $4k depending on the month. Its target is a monthly **set-aside** ($5,585 last year ÷ 12). The Hub compares annual-bills and travel against the **year so far** (target × months elapsed) instead of a single month.
+   - Personal categories are set to the $250/mo fun-money allowance, so the two line up.
 
-   | Category | Avg/mo | Median | | Category | Avg/mo | Median |
-   |---|---|---|---|---|---|---|
-   | groceries | $2,322 | $2,083 | | entertainment | $485 | $342 |
-   | shopping | $1,400 | $1,448 | | healthcare | $437 | $422 |
-   | travel | $1,325 | $1,538 | | subscriptions | $417 | $237 |
-   | dining | $1,201 | $1,262 | | kids-activities | $345 | $305 |
-   | bills-utilities | $845 | $259 | | gas-auto | $249 | $215 |
-   | household | $543 | $552 | | trey-personal | $238 | $129 |
-   | kids-other | $96 | $25 | | beryl-personal | $186 | $188 |
+   | Category | Last 12 mo median | Avg | Draft target | Stretch |
+   |---|---|---|---|---|
+   | groceries | $2,187 | $2,286 | **$2,300** | $2,200 |
+   | shopping | $1,479 | $1,433 | **$1,400** | $1,200 |
+   | dining | $1,209 | $956* | **$1,200** | $1,000 |
+   | travel (judged yearly) | $1,017 | $1,090 | **$1,000** | $900 |
+   | household | $552 | $553 | **$550** | $500 |
+   | annual-bills (judged yearly) | — | $465 | **$475** | $475 |
+   | entertainment | $362 | $567 | **$450** | $400 |
+   | healthcare | $422 | $449 | **$450** | $450 |
+   | kids-activities | $302 | $336 | **$325** | $325 |
+   | bills-utilities (monthly only) | — | $285 | **$300** | $300 |
+   | gas-auto | $215 | $245 | **$250** | $250 |
+   | trey-personal | $129 | $227 | **$250** | $250 |
+   | beryl-personal | $188 | $186 | **$250** | $250 |
+   | subscriptions (monthly only) | — | $147 | **$175** | $150 |
+   | kids-other | $41 | $103 | **$100** | $100 |
+   | other | $10 | ~$0 | **$50** | $50 |
+   | **Total** | | **~$9,600 actual** | **$9,525** | **$8,900** |
 
-   Total about $10k/mo, excluding one-time and trey-work. Bills-utilities' average is well above its median because of lumpy insurance premiums and one $3,730 City of Westminster charge.
+   \*Dining's average is dragged down by a -$2,100 Teleferic refund (Nov 2025) that's in dining while the original charge is trey-work.
+
+   Only card spending is tracked. No electric, gas, mortgage or phone appears in Transactions (presumably paid from the bank), so these targets cover card spend only.
+   - **Data fixes found while building this**, pending Trey's OK:
+     - A **bogus $7,737.64 "Chase" row on 2026-09-07** (bills-utilities, notes "Minimum payment"). It's a card payment-due email parsed as a purchase. Hide it (Transactions column H = TRUE). It's also why "Chase" is in Fixed Bills.
+     - The Teleferic -$2,100 refund should be trey-work.
+     - City of Westminster **$3,730 on 2026-05-03**: what was it? If it was one-off, it's one-time.
+     - Ride1up $1,116 (e-bike, Dec 2025) in entertainment: probably one-time.
+     - Move existing rows to annual-bills with **Always for…** in the Hub (this also teaches Merchant Memory): Travelers Per Ins, Card Annual Fee, Costco Membership, ANNUAL MEMBERSHIP FEE, RENEWAL MEMBERSHIP FEE, NordVPN, Subaru Starlink, The Atlantic, Google One, Duolingo.
+     - **Sep 1–24 2026 is nearly empty** (18 transactions vs ~165 in a normal month). The ~4 weeks of alerts queued while the agent was paused don't seem to have landed. See T-30.
+   - To go live: re-paste `family-agent.gs` (the new category + Gemini rules), push the app, add an `annual-bills` row to Budget Targets, enter the targets.
 4. Spot-check a few months in the Hub's Budget tab and fix any wrong categories (tap row → category → **Always for …**, which also writes Merchant Memory). Worth a glance: the `trey-work` rows I tagged by hand (~$43k: conference/society fees, Tacovision/Teleferic/Library Bar/Quad Conf Ctr catering, FedEx Office printing) and the `one-time` rows ($900+ shopping/household: Lovesac, Colorado Service Techs, Uplift Desk, etc.).
 
 Earlier history of the Gemini backfill attempt (2026-08-28, abandoned) is in git history. See commit `2c3f9df`'s version of this file.
@@ -193,6 +215,7 @@ The React app lives at the repo root (not in a subfolder). Key files for a fresh
 | T-27 | Verify external setup steps (Gmail filters/forwarding, OAuth, triggers) | Phase 3+ | Added 2026-08-17, prompted by "did we set up Amex processing?" turning up several unconfirmed setup steps outside the codebase (filters/forwarding/OAuth/triggers don't show up in git). See the checklist under "Right now" above for the full unconfirmed list — Amex filter, Beryl's Amazon/Target forwarding, Sheets OAuth write scope, Beryl's own sign-in/consent, the monthly Fun Money trigger, the statement-import trigger, and the still-empty Fixed Bills/Budget Targets tabs. |
 | T-28 | Deploy work-expense auto-tagging + full historical card backfill | Phase 3+ | Added 2026-08-22. Two pieces, both built but **not yet live** — script not yet re-pasted into script.google.com: **A)** `processWorkExpenseImport`/`matchWorkExpenses_` (see "Current architecture" below and `apps-script/README.md`'s "Work expense import (Payhawk) setup" section) — matches a Payhawk work-expense export against Transactions by date+amount and auto-tags `trey-work`, so Trey stops manually recategorizing every reimbursable charge. **B)** 12 CSV exports already pulled (via Claude in Chrome, Trey logged in) covering Aug 21, 2024 → present for all 4 Chase cards + Amex, sitting locally in Downloads, not yet emailed in. Remaining steps once back at a machine with the files: 1) re-paste `family-agent.gs` into script.google.com and re-authorize if prompted, 2) email all 12 card CSVs in labeled `Statement Import`, 3) email the Payhawk `Expenses.csv` in labeled `Work Expense Import`, 4) run `processStatementImports`, `processWorkExpenseImport`, then `matchWorkExpensesNow` from the editor (or just wait for the 5-minute triggers), 5) spot-check the Work Expenses tab's Matched column and a few `trey-work`-tagged Transactions rows look right, 6) run `suggestFixedBills` once the 2-year history is in. Chase's Activity-download UI hard-caps at 24 months back, which is why Aug 21, 2024 was chosen as the project-wide data start date rather than June 2024 (when the Payhawk relationship actually began) — Amex's own export already covers June 2024 onward for that card, only the 4 Chase cards are missing that ~2-month window, judged not worth chasing down via per-statement PDFs. |
 | T-29 | Review leftover Fixed Bills rows | Phase 3+ | Added 2026-10-10. Each of these still counts as a fixed bill. Decide whether it is one, and if not, type `excluded` in Fixed Bills column B (or tap a transaction in the Hub → **Not a fixed bill**). Don't delete rows. **Google**: Trey thinks it may be a real bill; find out what it is. **Chase**: unclear what this is. **Colorado Service Techs**: a $900+ one-time charge, probably not a bill. **Billie**, **Lifestancehealthcolor**: stopped recurring, so they're harmless either way (optional). |
+| T-30 | Recover the Sep 2026 transaction gap | Phase 3+ | Added 2026-10-10. Transactions has only 18 rows for 2026-09-01 – 09-24, against ~165 in a normal month. The alerts that queued while the agent was paused (2026-08-28 → 09-25) apparently never landed. Check Gmail's `Budget Agent` and `Budget Agent/Needs Review` labels for unprocessed alerts and relabel them so `processBudgetEmails` picks them up. If they're gone, export Sep statements as CSV from each card and run them through the clean-import path (the dedupe skips anything already in the sheet). |
 
 ### Done
 

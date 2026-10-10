@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { TRANSACTION_CATEGORIES } from '../lib/googleSheets';
@@ -38,6 +38,12 @@ function daysInMonth(monthKey) {
 }
 
 const TREND_MONTH_COUNT = 6;
+
+// Lumpy categories whose spend lands in a few big months (a $3k insurance
+// premium, a $1.6k flight), so a single month over target means little.
+// Their Budget Targets number is a monthly set-aside, compared against the
+// year so far (target × months elapsed) instead of the month alone.
+const YEARLY_TARGET_CATEGORIES = ['annual-bills', 'travel'];
 
 function lastNMonthKeys(n, endMonthKey) {
   const months = [];
@@ -110,6 +116,7 @@ export default function BudgetPage() {
   // null, 'trey', or 'beryl'. Only one at a time; tapping the open one again
   // closes it.
   const [showFunMoneyFor, setShowFunMoneyFor] = useState(null);
+  const mainScrollRef = useRef(null);
   // Multi-select: tapping a category in "By category" toggles it in/out of
   // this set (e.g. kids-other + kids-activities together) rather than
   // picking exactly one.
@@ -187,6 +194,15 @@ export default function BudgetPage() {
   );
 
   const categoryRows = Object.entries(budgetCategoryTotals).sort((a, b) => b[1] - a[1]);
+
+  // Year-to-date spend through the selected month, for YEARLY_TARGET_CATEGORIES.
+  const selectedYearPrefix = selectedBudgetMonth.slice(0, 4);
+  const monthsElapsedInYear = Number(selectedBudgetMonth.slice(5, 7));
+  const yearToDateByCategory = {};
+  budgetTransactions
+    .filter((t) => YEARLY_TARGET_CATEGORIES.includes(t.category)
+      && t.date.startsWith(selectedYearPrefix) && t.date.slice(0, 7) <= selectedBudgetMonth)
+    .forEach((t) => { yearToDateByCategory[t.category] = (yearToDateByCategory[t.category] || 0) + t.amount; });
   const yearCategoryRows = Object.entries(yearCategoryTotals).sort((a, b) => b[1] - a[1]);
 
   const toggleTrendCategory = (category) => {
@@ -396,7 +412,10 @@ export default function BudgetPage() {
                   ...(low ? { borderColor: 'var(--ev-coral-tx)' } : {}),
                   ...(isOpen ? { borderColor: 'var(--accent-primary)' } : {}),
                 }}
-                onClick={() => setShowFunMoneyFor((prev) => (prev === person ? null : person))}
+                onClick={() => {
+                  setShowFunMoneyFor((prev) => (prev === person ? null : person));
+                  mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               >
                 <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>{formatCategoryLabel(person)}</div>
                 <div style={{ fontSize: '1.2em', fontWeight: 'var(--font-weight-heading)', color: low ? 'var(--ev-coral-tx)' : undefined }}>
@@ -409,11 +428,50 @@ export default function BudgetPage() {
       </div>
 
       <div className="fp-main" style={{ overflow: 'hidden' }}>
-        <div className="task-scroll">
+        <div className="task-scroll" ref={mainScrollRef}>
           {budgetActionError && (
             <div style={{ color: 'var(--ev-coral-tx)', padding: '0.6em 0', fontSize: '0.85em' }}>
               Could not save that change: {budgetActionError}
             </div>
+          )}
+
+          {/* Top of the panel, above everything else, so tapping a fun-money
+              card in the sidebar shows the ledger right away instead of below
+              the whole month's transactions. */}
+          {!!showFunMoneyFor && (
+            <>
+              <div className="task-section-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5em' }}>
+                <span>
+                  {formatCategoryLabel(showFunMoneyFor)}&apos;s fun money — all activity ({selectedPersonFunEntries.length})
+                </span>
+                <button
+                  className="add-btn"
+                  style={{ padding: '0.15em 0.5em', fontSize: '0.85em' }}
+                  onClick={() => setShowFunMoneyFor(null)}
+                >
+                  Close
+                </button>
+              </div>
+              {selectedPersonFunEntries.map((f, i) => (
+                <div key={`${f.date}-${i}`} className="task-item">
+                  <div>
+                    <div className="task-text">{f.description || formatCategoryLabel(f.type)}</div>
+                    <div className="task-meta">
+                      <span className="task-due">{f.date}</span>
+                      <span className="task-tag tag-family">{formatCategoryLabel(f.type)}</span>
+                    </div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)', color: f.amount < 0 ? 'var(--ev-coral-tx)' : 'var(--ev-teal-tx)' }}>
+                    {formatCurrency(f.amount)}
+                  </div>
+                </div>
+              ))}
+              {!selectedPersonFunEntries.length && (
+                <div style={{ color: 'var(--text-muted)', padding: '1em' }}>
+                  No fun-money activity yet for {formatCategoryLabel(showFunMoneyFor)}.
+                </div>
+              )}
+            </>
           )}
 
           {showYearView && (
@@ -471,8 +529,11 @@ export default function BudgetPage() {
             <>
               <div className="task-section-head">By category (tap to show a trend below)</div>
               {categoryRows.map(([category, amount]) => {
+                const isYearly = YEARLY_TARGET_CATEGORIES.includes(category);
                 const target = budgetTargets[category];
-                const over = target > 0 && amount > target;
+                const yearToDate = yearToDateByCategory[category] || 0;
+                const yearToDateTarget = (target || 0) * monthsElapsedInYear;
+                const over = target > 0 && (isYearly ? yearToDate > yearToDateTarget : amount > target);
                 const isSelected = selectedTrendCategories.has(category);
                 return (
                   <div
@@ -486,7 +547,9 @@ export default function BudgetPage() {
                       {target > 0 && (
                         <div className="task-meta">
                           <span className={`task-due${over ? ' overdue' : ''}`}>
-                            {over ? `Over by ${formatCurrency(amount - target)}` : `${formatCurrency(target - amount)} left`}
+                            {isYearly
+                              ? `${selectedYearPrefix} so far: ${formatCurrency(yearToDate)} of ${formatCurrency(yearToDateTarget)} set aside`
+                              : over ? `Over by ${formatCurrency(amount - target)}` : `${formatCurrency(target - amount)} left`}
                           </span>
                         </div>
                       )}
@@ -773,33 +836,6 @@ export default function BudgetPage() {
                       ? 'No transactions yet — they will show up here once the email agent processes a card alert.'
                       : `No transactions for ${formatMonthLabel(selectedBudgetMonth)}.`}
             </div>
-          )}
-
-          {!!showFunMoneyFor && (
-            <>
-              <div className="task-section-head">
-                {formatCategoryLabel(showFunMoneyFor)}&apos;s fun money — all activity ({selectedPersonFunEntries.length})
-              </div>
-              {selectedPersonFunEntries.map((f, i) => (
-                <div key={`${f.date}-${i}`} className="task-item">
-                  <div>
-                    <div className="task-text">{f.description || formatCategoryLabel(f.type)}</div>
-                    <div className="task-meta">
-                      <span className="task-due">{f.date}</span>
-                      <span className="task-tag tag-family">{formatCategoryLabel(f.type)}</span>
-                    </div>
-                  </div>
-                  <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)', color: f.amount < 0 ? 'var(--ev-coral-tx)' : 'var(--ev-teal-tx)' }}>
-                    {formatCurrency(f.amount)}
-                  </div>
-                </div>
-              ))}
-              {!selectedPersonFunEntries.length && (
-                <div style={{ color: 'var(--text-muted)', padding: '1em' }}>
-                  No fun-money activity yet for {formatCategoryLabel(showFunMoneyFor)}.
-                </div>
-              )}
-            </>
           )}
 
           {!showFunMoneyFor && !!recentFunActivity.length && (

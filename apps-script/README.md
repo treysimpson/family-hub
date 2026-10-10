@@ -683,7 +683,7 @@ comes in already renamed.
 categories (set 2026-08-06, split 2026-08-10 to pull `subscriptions` out of
 `bills-utilities`: groceries, dining, gas-auto, travel, household,
 entertainment, healthcare, kids-activities, kids-other, bills-utilities,
-subscriptions, beryl-personal, trey-personal, shopping, trey-work, plus the
+subscriptions, annual-bills (added 2026-10-10 for once-a-year bills), beryl-personal, trey-personal, shopping, trey-work, plus the
 structural one-time/other). `EXCLUDED_FROM_BUDGET` lists which categories
 don't count toward the regular monthly total (currently one-time and
 trey-work, since one is a major expense and the other gets reimbursed).
@@ -694,6 +694,10 @@ an existing tab. To pick up a category change: delete the "Budget Targets"
 tab from the spreadsheet (note down any target numbers you'd already
 entered first), then re-run `setupBudgetSheets` to recreate it with the
 current category list.
+
+Adding a single category doesn't need the delete-and-recreate: just type a
+new row (category name, target) at the bottom of Budget Targets, the way
+`annual-bills` was added.
 
 ## Known limitations (v1)
 

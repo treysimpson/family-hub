@@ -39,7 +39,7 @@ const FIXED_BILLS_TAB = 'Fixed Bills';
 // genuinely unclear. The rest are Trey's actual household categories.
 const TRANSACTION_CATEGORIES = [
   'groceries', 'dining', 'gas-auto', 'travel', 'household', 'entertainment',
-  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions',
+  'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions', 'annual-bills',
   'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'other',
 ];
 const EXCLUDED_FROM_BUDGET = ['one-time', 'trey-work'];
@@ -1409,13 +1409,14 @@ function buildStatementPrompt_() {
     '  7. "dining": restaurants, takeout, coffee shops.',
     '  8. "gas-auto": gas station fuel, car repair/maintenance, auto parts, DMV.',
     '  9. "travel": flights, hotels, rental cars, vacation-related.',
-    '  10. "bills-utilities": recurring bills required to keep the household running -- electric, water, gas, internet, phone, insurance, mortgage/rent.',
-    '  11. "subscriptions": recurring but optional subscription/membership charges -- streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
-    '  12. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
-    '  13. "entertainment": one-off fun purchases -- movie tickets, concerts, hobbies -- not recurring subscriptions, which go under "subscriptions" above.',
-    '  14. "healthcare": medical, dental, pharmacy.',
-    '  15. "shopping": general retail that does not clearly fit any category above.',
-    '  16. "other": genuinely unclear.',
+    '  10. "annual-bills": a bill paid once a year (or a few times a year) rather than monthly -- annual insurance premiums (home, auto, umbrella), credit card annual fees, annual memberships or subscriptions (Costco, Amazon Prime annual, an app billed yearly), property tax, annual city or HOA charges. Text like "annual fee", "renewal", "yearly" or "membership fee" is a strong signal.',
+    '  11. "bills-utilities": recurring bills required to keep the household running -- electric, water, gas, internet, phone, monthly insurance, mortgage/rent. An insurance premium paid yearly is "annual-bills" instead.',
+    '  12. "subscriptions": recurring but optional subscription/membership charges -- streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
+    '  13. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
+    '  14. "entertainment": one-off fun purchases -- movie tickets, concerts, hobbies -- not recurring subscriptions, which go under "subscriptions" above.',
+    '  15. "healthcare": medical, dental, pharmacy.',
+    '  16. "shopping": general retail that does not clearly fit any category above.',
+    '  17. "other": genuinely unclear.',
   ].join('\n');
 }
 
@@ -1730,7 +1731,7 @@ function buildCostcoReceiptPrompt_() {
   return [
     'You are given a photo of a paper Costco warehouse receipt, which may be a purchase or a return/refund slip from the membership desk. Extract it as JSON.',
     '',
-    'Costco receipts print terse abbreviated item names and a numeric item code, not a department header the way a Target receipt does (e.g. "ORG SPINACH", "KS BATH TISSU", "ROTISS CHKN") -- there is also no separate tax line for most grocery items (food is generally untaxed), but non-food items usually do have tax, and an "E" printed after a line\'s price marks it as exempt from tax, everything else is generally taxable. Use general knowledge of what a cryptic Costco item name usually refers to (e.g. "KS" prefix means Kirkland Signature, Costco\'s store brand, not a category by itself -- categorize by what the product actually is) to decide its category. A membership renewal charge, if present as its own line, is "bills-utilities". Gas station fuel purchases (separate from the warehouse receipt, if included) are "gas-auto".',
+    'Costco receipts print terse abbreviated item names and a numeric item code, not a department header the way a Target receipt does (e.g. "ORG SPINACH", "KS BATH TISSU", "ROTISS CHKN") -- there is also no separate tax line for most grocery items (food is generally untaxed), but non-food items usually do have tax, and an "E" printed after a line\'s price marks it as exempt from tax, everything else is generally taxable. Use general knowledge of what a cryptic Costco item name usually refers to (e.g. "KS" prefix means Kirkland Signature, Costco\'s store brand, not a category by itself -- categorize by what the product actually is) to decide its category. A membership renewal charge, if present as its own line, is "annual-bills". Gas station fuel purchases (separate from the warehouse receipt, if included) are "gas-auto".',
     '- "date" is the purchase or return date in YYYY-MM-DD format.',
     '- If this is a RETURN or REFUND (a membership-desk return slip, or any receipt showing money credited back rather than charged), make "total" the refunded amount as a NEGATIVE number. Otherwise (a normal warehouse purchase), "total" is the actual amount charged, including tax, as a positive number.',
     '- "categories" breaks down the items on the receipt, before tax, into subtotals per category. Place every line item into exactly one of these categories: ' + ITEMIZED_CATEGORIES.join(', ') + '. For example: fresh food, pantry items, and beverages map to groceries; vitamins, medicine, and personal care map to healthcare; diapers, kids clothing, and toys map to kids-other; electronics, home goods, and cleaning supplies map to household; adult clothing map to shopping. The subtotal for a category is the sum of the pre-tax prices of the items placed in that category, as a POSITIVE number even on a return -- only the top-level "total" carries the negative sign. Do not include tax in any category subtotal -- the gap between the sum of your subtotals and the total will be treated separately as tax. "items" is a plain list of the item names placed in that category, exactly as shown on the receipt (abbreviated is fine), with no prices included.',
@@ -1998,7 +1999,7 @@ function backfillCostcoReceiptItems_() {
 // next monthly run. Hidden transactions (T-11) are never considered. Run
 // manually from the editor any time, or via the monthly trigger -- see
 // apps-script/README.md.
-const FIXED_BILL_CATEGORIES = ['subscriptions', 'bills-utilities'];
+const FIXED_BILL_CATEGORIES = ['subscriptions', 'bills-utilities', 'annual-bills'];
 const NEVER_FIXED_CATEGORIES = ['dining', 'groceries', 'gas-auto', 'shopping', 'travel', 'one-time', 'trey-work'];
 const FIXED_BILL_MAX_AGE_DAYS = 400;
 
@@ -2152,13 +2153,14 @@ function buildTransactionPrompt_(text) {
     '  7. "dining": restaurants, takeout, coffee shops.',
     '  8. "gas-auto": gas station fuel, car repair/maintenance, auto parts, DMV.',
     '  9. "travel": flights, hotels, rental cars, vacation-related.',
-    '  10. "bills-utilities": recurring bills required to keep the household running — electric, water, gas, internet, phone, insurance, mortgage/rent.',
-    '  11. "subscriptions": recurring but optional subscription/membership charges — streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
-    '  12. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
-    '  13. "entertainment": one-off fun purchases — movie tickets, concerts, hobbies — not recurring subscriptions, which go under "subscriptions" above.',
-    '  14. "healthcare": medical, dental, pharmacy.',
-    '  15. "shopping": general retail that does not clearly fit any category above.',
-    '  16. "other": genuinely unclear.',
+    '  10. "annual-bills": a bill paid once a year (or a few times a year) rather than monthly -- annual insurance premiums (home, auto, umbrella), credit card annual fees, annual memberships or subscriptions (Costco, Amazon Prime annual, an app billed yearly), property tax, annual city or HOA charges. Text like "annual fee", "renewal", "yearly" or "membership fee" is a strong signal.',
+    '  11. "bills-utilities": recurring bills required to keep the household running — electric, water, gas, internet, phone, monthly insurance, mortgage/rent. An insurance premium paid yearly is "annual-bills" instead.',
+    '  12. "subscriptions": recurring but optional subscription/membership charges — streaming (Netflix, Hulu, Disney+), music (Spotify), apps (Duolingo), cloud storage, software, gym or club memberships. The test is "would this get cancelled before an essential bill would."',
+    '  13. "household": home maintenance, home goods, furniture, routine (not major) home purchases.',
+    '  14. "entertainment": one-off fun purchases — movie tickets, concerts, hobbies — not recurring subscriptions, which go under "subscriptions" above.',
+    '  15. "healthcare": medical, dental, pharmacy.',
+    '  16. "shopping": general retail that does not clearly fit any category above.',
+    '  17. "other": genuinely unclear.',
     '- "notes" can capture anything else potentially useful, or omit if nothing extra applies.',
     '',
     'Email:',
