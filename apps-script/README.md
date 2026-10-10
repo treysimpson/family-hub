@@ -683,7 +683,7 @@ comes in already renamed.
 categories (set 2026-08-06, split 2026-08-10 to pull `subscriptions` out of
 `bills-utilities`: groceries, dining, gas-auto, travel, household,
 entertainment, healthcare, kids-activities, kids-other, bills-utilities,
-subscriptions, annual-bills (added 2026-10-10 for once-a-year bills), beryl-personal, trey-personal, shopping, trey-work, plus the
+subscriptions (anything cancellable, monthly or yearly), annual-bills (added 2026-10-10: yearly or lumpy bills that can't be cancelled, like insurance premiums, card annual fees and tuition), beryl-personal, trey-personal, shopping, trey-work, plus the
 structural one-time/other). `EXCLUDED_FROM_BUDGET` lists which categories
 don't count toward the regular monthly total (currently one-time and
 trey-work, since one is a major expense and the other gets reimbursed).
