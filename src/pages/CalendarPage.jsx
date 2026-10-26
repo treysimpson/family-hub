@@ -34,7 +34,7 @@ export default function CalendarPage() {
       if (id === 'all') {
         return next.size === PERSON_PILLS.length ? new Set() : new Set(PERSON_PILLS.map((p) => p.id));
       }
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };

@@ -62,13 +62,20 @@ async function getTokenClient() {
 // prompt: '' for silent renewal (no UI if the browser still has an active Google
 // session), 'consent'/undefined for an explicit sign-in the user initiated.
 function requestToken({ prompt } = {}) {
-  return new Promise(async (resolve, reject) => {
-    const client = await getTokenClient();
-    client.callback = (response) => {
-      if (response.error) { reject(new Error(response.error)); return; }
-      resolve(storeToken(response.access_token, response.expires_in));
-    };
-    client.requestAccessToken({ prompt });
+  // Not an async executor: if getTokenClient() ever rejects (e.g. the GIS
+  // script fails to load -- blocked by an ad blocker, no network), an async
+  // executor's rejection has nowhere to go -- it doesn't call the outer
+  // reject, so the returned promise would just hang forever and signIn()
+  // would sit on "Signing in..." with no error ever shown. .catch(reject)
+  // below routes that failure to the caller properly.
+  return new Promise((resolve, reject) => {
+    getTokenClient().then((client) => {
+      client.callback = (response) => {
+        if (response.error) { reject(new Error(response.error)); return; }
+        resolve(storeToken(response.access_token, response.expires_in));
+      };
+      client.requestAccessToken({ prompt });
+    }).catch(reject);
   });
 }
 

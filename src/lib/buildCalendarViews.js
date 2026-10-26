@@ -87,8 +87,15 @@ export function buildNextNDays(events, n, today = new Date(), weatherByDate = ne
 }
 
 export function buildAgendaGroups(events, today = new Date(), days = 14) {
+  // `days` was previously declared but never actually applied -- every
+  // future event showed up here with no upper bound, so a single far-out
+  // event (a recurring yearly one, a vacation booked a year ahead) would
+  // sit at the bottom of the Agenda tab indefinitely instead of this
+  // staying a genuine "next 2 weeks" view.
+  const horizon = new Date(today);
+  horizon.setDate(horizon.getDate() + days);
   const upcoming = events
-    .filter((ev) => ev.end >= today)
+    .filter((ev) => ev.end >= today && ev.start < horizon)
     .sort((a, b) => a.start - b.start);
 
   const groups = new Map();
