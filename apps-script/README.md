@@ -688,10 +688,17 @@ comes in already renamed.
 categories (set 2026-08-06, split 2026-08-10 to pull `subscriptions` out of
 `bills-utilities`: groceries, dining, gas-auto, travel, household,
 entertainment, healthcare, kids-activities, kids-other, bills-utilities,
-subscriptions (anything cancellable, monthly or yearly), annual-bills (added 2026-10-10: yearly or lumpy bills that can't be cancelled, like insurance premiums, card annual fees and tuition), beryl-personal, trey-personal, shopping, trey-work, plus the
+subscriptions (anything cancellable, monthly or yearly), annual-bills (added 2026-10-10: yearly or lumpy bills that can't be cancelled, like insurance premiums, card annual fees and tuition), beryl-personal, trey-personal, shopping, trey-work, loan-payments (added 2026-10-26: mortgage/HELOC/car loan, see T-31 in the project doc), plus the
 structural one-time/other). `EXCLUDED_FROM_BUDGET` lists which categories
-don't count toward the regular monthly total (currently one-time and
-trey-work, since one is a major expense and the other gets reimbursed).
+don't count toward the regular monthly total (currently one-time, trey-work,
+and loan-payments — a major expense, a reimbursed one, and a fixed
+non-discretionary obligation respectively, none of them a spending choice to
+pace against a monthly target the way groceries or dining are).
+
+Note `loan-payments` deliberately has **no Budget Targets row** — like
+one-time/trey-work, an excluded-from-budget category doesn't get one (see
+the "Adding a single category" note below, which is about a category that
+*does* belong in the regular monthly total).
 
 The **Budget Targets** tab is only auto-populated with category rows the
 first time it's created — changing the category list later does not update
