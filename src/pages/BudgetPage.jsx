@@ -103,13 +103,14 @@ export default function BudgetPage() {
     budgetLive, budgetTransactions, budgetMonthTotal, budgetError,
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
-    budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
+    budgetOneTimeTotal, budgetReimbursableTotal, budgetLoanPaymentsTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError, toggleFixedBill,
     toggleHouseMaintenanceTag, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   } = useApp();
   const [unlocked, setUnlocked] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [showTreyWork, setShowTreyWork] = useState(false);
+  const [showLoanPayments, setShowLoanPayments] = useState(false);
   const [showHouseMaintenance, setShowHouseMaintenance] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
@@ -236,7 +237,7 @@ export default function BudgetPage() {
   // everywhere else on this page.
   const trendMonthLabels = trendMonths.map((m) => formatMonthLabel(m).slice(0, 3));
   const trendTotals = trendMonths.map((m) => budgetTransactions
-    .filter((t) => !['one-time', 'trey-work'].includes(t.category) && t.date.startsWith(m))
+    .filter((t) => !['one-time', 'trey-work', 'loan-payments'].includes(t.category) && t.date.startsWith(m))
     .reduce((sum, t) => sum + t.amount, 0));
 
   // All-time, not scoped to the selected month — reimbursements often lag
@@ -245,6 +246,13 @@ export default function BudgetPage() {
   // reimbursement status himself outside the app for now (T-25).
   const treyWorkTransactions = [...budgetTransactions]
     .filter((t) => t.category === 'trey-work')
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  // Mortgage/HELOC/car loan (T-31) -- all-time for the same reason as
+  // treyWorkTransactions above: useful to audit that each loan is actually
+  // hitting monthly, not a thing to view scoped to one month.
+  const loanPaymentTransactions = [...budgetTransactions]
+    .filter((t) => t.category === 'loan-payments')
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   // House-upkeep spend (T-32) spans "household" (routine, e.g. a $99 HVAC
@@ -406,6 +414,21 @@ export default function BudgetPage() {
             </div>
             <div style={{ fontSize: '1.1em', fontWeight: 'var(--font-weight-heading)' }}>
               {formatCurrency(budgetReimbursableTotal)}
+            </div>
+          </div>
+        )}
+
+        {budgetLoanPaymentsTotal > 0 && (
+          <div
+            className="card tappable"
+            style={{ marginTop: '0.6em', padding: '0.6em 0.8em', cursor: 'pointer' }}
+            onClick={() => setShowLoanPayments((v) => !v)}
+          >
+            <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>
+              Loan payments (mortgage, HELOC, car) — tap to view all
+            </div>
+            <div style={{ fontSize: '1.1em', fontWeight: 'var(--font-weight-heading)' }}>
+              {formatCurrency(budgetLoanPaymentsTotal)}
             </div>
           </div>
         )}
@@ -630,6 +653,30 @@ export default function BudgetPage() {
               ))}
               {!treyWorkTransactions.length && (
                 <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No trey-work transactions yet.</div>
+              )}
+            </>
+          )}
+
+          {showLoanPayments && (
+            <>
+              <div className="task-section-head">
+                All loan payment transactions ({loanPaymentTransactions.length}) — not counted in totals above
+              </div>
+              {loanPaymentTransactions.map((t) => (
+                <div key={t.row} className="task-item">
+                  <div>
+                    <div className="task-text">{t.merchant}</div>
+                    <div className="task-meta">
+                      <span className="task-due">{t.date}{t.card ? ` · ${t.card}` : ''}</span>
+                    </div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)' }}>
+                    {formatCurrency(t.amount)}
+                  </div>
+                </div>
+              ))}
+              {!loanPaymentTransactions.length && (
+                <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No loan payment transactions yet.</div>
               )}
             </>
           )}

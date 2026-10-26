@@ -7,7 +7,7 @@ import { fixedBillKey } from '../lib/cardCredits';
 // Must match EXCLUDED_BUDGET_CATEGORIES in AppContext.jsx / EXCLUDED_FROM_BUDGET
 // in apps-script/family-agent.gs — these charts should reflect the same
 // "regular monthly spending" definition the rest of the Budget page uses.
-const EXCLUDED_FROM_CHARTS = ['one-time', 'trey-work'];
+const EXCLUDED_FROM_CHARTS = ['one-time', 'trey-work', 'loan-payments'];
 
 function formatCategoryLabel(category) {
   return category.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

@@ -12,7 +12,7 @@ export const BUDGET_SPREADSHEET_ID = '1e_W-BPgI9OIHKNJsxCnfqGvltpNAKuCFiUOFqhyU8
 export const TRANSACTION_CATEGORIES = [
   'groceries', 'dining', 'gas-auto', 'travel', 'household', 'entertainment',
   'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions', 'annual-bills',
-  'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'other',
+  'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'loan-payments', 'other',
 ];
 
 // Column order must match appendTransactionRow_ in apps-script/family-agent.gs.

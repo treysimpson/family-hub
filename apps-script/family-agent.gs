@@ -37,12 +37,19 @@ const FIXED_BILLS_TAB = 'Fixed Bills';
 // monthly total/category totals so they don't distort them, and are shown
 // as their own separate lines instead. "other" is a fallback for anything
 // genuinely unclear. The rest are Trey's actual household categories.
+// "loan-payments" added 2026-10-26 (T-31) for the mortgage/HELOC/car loan
+// bank-statement import -- see EXCLUDED_FROM_BUDGET below and
+// EXCLUDED_BUDGET_CATEGORIES in src/context/AppContext.jsx (must match).
+// NOT YET PASTED into script.google.com as of this edit -- prepared so
+// suggestFixedBills/setupBudgetSheets etc. have the right category list
+// the moment it is, not deployed blind by the autonomous loop. See
+// family-hub-project.md, "Right now".
 const TRANSACTION_CATEGORIES = [
   'groceries', 'dining', 'gas-auto', 'travel', 'household', 'entertainment',
   'healthcare', 'kids-activities', 'kids-other', 'bills-utilities', 'subscriptions', 'annual-bills',
-  'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'other',
+  'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'loan-payments', 'other',
 ];
-const EXCLUDED_FROM_BUDGET = ['one-time', 'trey-work'];
+const EXCLUDED_FROM_BUDGET = ['one-time', 'trey-work', 'loan-payments'];
 const FUN_MONEY_TAB = 'Fun Money';
 // Ledger-style: current balance per person is just the sum of all their rows
 // ever (allowances and spends), so "leftover rolls to next month" needs no
@@ -64,7 +71,7 @@ const AMAZON_LABEL_REVIEW = 'Amazon Orders/Needs Review';
 // Excludes one-time/trey-work: an item-count digest (or a receipt itemized
 // by department) gives no signal that a purchase is a major one-off or a
 // reimbursable work expense. Shared by Amazon and Target itemization below.
-const ITEMIZED_CATEGORIES = TRANSACTION_CATEGORIES.filter((c) => c !== 'one-time' && c !== 'trey-work');
+const ITEMIZED_CATEGORIES = TRANSACTION_CATEGORIES.filter((c) => !EXCLUDED_FROM_BUDGET.includes(c));
 
 // ---- Target order itemization (T-11 Phase E) ----
 // Unlike Amazon, a Target.com order confirmation email lists real per-item

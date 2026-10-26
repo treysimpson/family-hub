@@ -30,7 +30,14 @@ const BUDGET_REFRESH_MS = 5 * 60 * 1000;
 // measured preference -- tune freely.
 const SCREENSAVER_IDLE_MS = 5 * 60 * 1000;
 // Must match EXCLUDED_FROM_BUDGET in apps-script/family-agent.gs.
-const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work'];
+// "loan-payments" (added 2026-10-26, T-31) joins this list for the same
+// reason one-time/trey-work do: a fixed, non-discretionary obligation
+// (mortgage/HELOC/car loan) isn't a spending choice to pace against a
+// monthly target the way groceries or dining are, and at ~$3.5k/mo it would
+// swamp the existing $9,500 target (built from card spend only) rather than
+// meaningfully inform it. Gets its own total tile instead, same as the
+// other two -- see budgetLoanPaymentsTotal below.
+const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work', 'loan-payments'];
 const ALL_LISTS = { ...PERSON_LISTS, ...STORE_LISTS };
 
 function currentMonthKey() {
@@ -440,6 +447,11 @@ export function AppProvider({ children }) {
     [selectedMonthTransactions],
   );
 
+  const budgetLoanPaymentsTotal = useMemo(
+    () => selectedMonthTransactions.filter((t) => t.category === 'loan-payments').reduce((sum, t) => sum + t.amount, 0),
+    [selectedMonthTransactions],
+  );
+
   const budgetCategoryTotals = useMemo(() => {
     const totals = {};
     selectedMonthTransactions
@@ -559,7 +571,7 @@ export function AppProvider({ children }) {
     budgetLive, budgetTransactions: budgetTransactionsWithCredits, budgetMonthTotal, budgetError,
     selectedBudgetMonth, setSelectedBudgetMonth, selectedMonthTransactions,
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
-    budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
+    budgetOneTimeTotal, budgetReimbursableTotal, budgetLoanPaymentsTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
     toggleFixedBill, toggleHouseMaintenanceTag, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   };
