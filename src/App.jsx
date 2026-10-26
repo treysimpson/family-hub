@@ -6,6 +6,7 @@ import SettingsPanel from './components/panels/SettingsPanel';
 import AgentPanel from './components/panels/AgentPanel';
 import EventPanel from './components/panels/EventPanel';
 import WxDayPanel from './components/panels/WxDayPanel';
+import Screensaver from './components/Screensaver';
 import Home from './pages/Home';
 import CalendarPage from './pages/CalendarPage';
 import TasksPage from './pages/TasksPage';
@@ -47,6 +48,7 @@ function Screen() {
       <AgentPanel />
       <EventPanel />
       <WxDayPanel />
+      <Screensaver />
     </div>
   );
 }

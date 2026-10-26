@@ -623,4 +623,18 @@
   .theme-btn{padding:0.28em 0.75em;border-radius:var(--btn-radius);font-size:0.8em;border:0.5px solid var(--border-item);color:var(--text-secondary);cursor:pointer;transition:all 0.15s;font-weight:var(--font-weight-body);background:transparent;}
   .theme-btn.active{background:var(--theme-btn-active-bg);border-color:var(--theme-btn-active-bd);color:var(--theme-btn-active-tx);}
 
+  /* ── Screensaver (T-19) ── */
+  /* Covers everything (z-index above every panel) after the display sits
+     idle -- see SCREENSAVER_IDLE_MS in AppContext.jsx. Fades rather than
+     slides since there's no "direction" to a screensaver the way a side
+     panel has. pointer-events stays none while hidden so it never eats a
+     touch/click when transparent; Screensaver.jsx also only renders its
+     children while active, as a second guard. */
+  #screensaver{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6em;background:var(--bg-screen);opacity:0;pointer-events:none;transition:opacity 1.2s ease;}
+  #screensaver.show{opacity:1;pointer-events:auto;}
+  .ss-time{font-size:4.5em;font-weight:200;color:var(--text-primary);letter-spacing:0.02em;}
+  .ss-date{font-size:1.3em;color:var(--text-secondary);}
+  .ss-wx{display:flex;align-items:center;gap:0.5em;font-size:1.1em;color:var(--text-muted);margin-top:0.4em;}
+  .ss-note{position:absolute;bottom:1.4em;font-size:0.72em;color:var(--text-muted);opacity:0.6;}
+
   .tappable{cursor:pointer;}

@@ -25,6 +25,10 @@ const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const CALENDAR_REFRESH_MS = 5 * 60 * 1000;
 const TASKS_REFRESH_MS = 30 * 1000;
 const BUDGET_REFRESH_MS = 5 * 60 * 1000;
+// T-19: how long the wall display sits untouched before the screensaver
+// takes over. 5 minutes is a guess at a reasonable kiosk default, not a
+// measured preference -- tune freely.
+const SCREENSAVER_IDLE_MS = 5 * 60 * 1000;
 // Must match EXCLUDED_FROM_BUDGET in apps-script/family-agent.gs.
 const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work'];
 const ALL_LISTS = { ...PERSON_LISTS, ...STORE_LISTS };
@@ -53,6 +57,7 @@ export function AppProvider({ children }) {
   const [wxDayPanel, setWxDayPanel] = useState({ open: false, data: null });
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [screensaverActive, setScreensaverActive] = useState(false);
   const [weather, setWeather] = useState(null);
   const [weatherError, setWeatherError] = useState(null);
   const [calendarEvents, setCalendarEvents] = useState(null);
@@ -82,6 +87,28 @@ export function AppProvider({ children }) {
   const [selectedBudgetYear, setSelectedBudgetYear] = useState(() => new Date().getFullYear());
   const [funMoneyEntries, setFunMoneyEntries] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
+
+  // T-19 screensaver: any touch/click/key resets the idle clock; once it
+  // runs out, the screensaver takes over (see #screensaver in index.css /
+  // Screensaver.jsx) until the next interaction. pointerdown covers mouse,
+  // touch and pen in one listener; keydown is separate since a bare
+  // keypress has no pointer event.
+  useEffect(() => {
+    let idleTimer;
+    const resetIdleTimer = () => {
+      setScreensaverActive(false);
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => setScreensaverActive(true), SCREENSAVER_IDLE_MS);
+    };
+    document.addEventListener('pointerdown', resetIdleTimer);
+    document.addEventListener('keydown', resetIdleTimer);
+    resetIdleTimer();
+    return () => {
+      clearTimeout(idleTimer);
+      document.removeEventListener('pointerdown', resetIdleTimer);
+      document.removeEventListener('keydown', resetIdleTimer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -524,7 +551,7 @@ export function AppProvider({ children }) {
     eventPanel, openEvent, closeEvent, navToEvent,
     wxDayPanel, openWxDay, closeWxDay,
     agentPanelOpen, toggleAgentPanel,
-    settingsPanelOpen, toggleSettingsPanel,
+    settingsPanelOpen, toggleSettingsPanel, screensaverActive,
     weather, weatherError,
     calendarViews, calendarError,
     tasksLive, personTasks, groceryTasks, tasksError,
