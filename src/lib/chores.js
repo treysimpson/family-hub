@@ -8,6 +8,7 @@
 // period is just today's date, so it's automatically "undone" again the
 // moment the date rolls over; Weekly/Monthly work the same way one level up.
 import { toDateKey, startOfWeek, addDays } from './dateGrid';
+import { initialChores } from '../data/mockData';
 
 const STORAGE_KEY = 'fh-chores-completions';
 
@@ -139,4 +140,54 @@ export function redeemReward(personId, reward) {
     date: toDateKey(new Date()),
   });
   saveRedemptions(redemptions);
+}
+
+// ---- Chore definitions (added 2026-10-26) ----
+// Who has which chore, how often, which routine, how many points -- was
+// hardcoded in mockData.js with no way to change it in-app. Stored in
+// localStorage now, seeded from mockData's initialChores as the starting
+// set rather than an unchangeable ceiling; mockData.js stays the source of
+// the *default* list (useful for a from-scratch setup, or reference), this
+// is the *live, editable* one. Deliberately not synced to Google Sheets --
+// this is a per-device kiosk setting, same spirit as the Budget PIN.
+
+const DEFINITIONS_KEY = 'fh-chores-definitions';
+
+export function getChoreDefinitions() {
+  try {
+    const raw = localStorage.getItem(DEFINITIONS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fall through to defaults
+  }
+  return initialChores;
+}
+
+function saveChoreDefinitions(data) {
+  try {
+    localStorage.setItem(DEFINITIONS_KEY, JSON.stringify(data));
+  } catch {
+    // Non-fatal -- same reasoning as save()/saveRedemptions() above.
+  }
+}
+
+export function addChore(personId, { text, freq, routine, points }) {
+  const data = getChoreDefinitions();
+  const chore = {
+    id: `custom-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+    text: text.trim(),
+    freq,
+    routine: routine?.trim() || null,
+    points: Number(points) || 5,
+  };
+  const next = { ...data, [personId]: [...(data[personId] || []), chore] };
+  saveChoreDefinitions(next);
+  return next;
+}
+
+export function removeChore(personId, choreId) {
+  const data = getChoreDefinitions();
+  const next = { ...data, [personId]: (data[personId] || []).filter((c) => c.id !== choreId) };
+  saveChoreDefinitions(next);
+  return next;
 }

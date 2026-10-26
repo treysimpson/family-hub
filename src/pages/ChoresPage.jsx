@@ -1,23 +1,28 @@
 import { useState } from 'react';
-import { initialChores, choreProgressColors, people, REWARD_KIDS, rewardCatalog } from '../data/mockData';
+import { choreProgressColors, people, REWARD_KIDS, rewardCatalog } from '../data/mockData';
 import { toDateKey, startOfWeek, addDays } from '../lib/dateGrid';
 import {
   periodKeyFor, isChoreDone, toggleChoreDone, daysDoneInWeek, totalCompletions,
   pointsBalance, redeemReward, redemptionHistory,
+  getChoreDefinitions, addChore, removeChore,
 } from '../lib/chores';
 
 const PERSON_ORDER = ['trey', 'beryl', 'bryce', 'emery'];
+const FREQ_OPTIONS = ['Daily', 'Weekly', 'Monthly'];
 
-// Chore *definitions* (who has which chore, how often, which routine, how
-// many points) still come from mockData -- only completion state (and now
-// redemptions) is live, in localStorage. Adding/editing chores or rewards
-// in-app isn't built yet, same as before.
+// Chore definitions (who has which chore, how often, which routine, how
+// many points) are now live and editable (src/lib/chores.js,
+// getChoreDefinitions/addChore/removeChore) -- mockData.js's initialChores
+// is just the seed a fresh browser starts from. Icons are keyed by id for
+// the original seeded chores; anything added in-app falls back to a plain
+// generic icon since there's no way to pick one in the UI yet.
 const CHORE_ICONS = {
   ch1: '🗑️', ch2: '🧹', ch3: '🌿', ch4: '🚪',
   ch5: '🧺', ch6: '🛒', ch7: '🚿', ch8: '🍱', ch9: '🍳',
   ch10: '🛏️', ch11: '🍽️', ch12: '🧸', ch13: '🐕',
   ch14: '🛏️', ch15: '🍽️', ch16: '🧸', ch17: '🪴', ch18: '🧽',
 };
+const DEFAULT_CHORE_ICON = '📝';
 
 function formatWeekLabel(weekStart) {
   const end = addDays(weekStart, 6);
@@ -61,11 +66,22 @@ function RingIcon({ done, total, color }) {
   );
 }
 
+const EMPTY_DRAFT = { text: '', freq: 'Weekly', routine: '', points: 5 };
+
 export default function ChoresPage() {
   const today = new Date();
   const thisWeekStart = startOfWeek(today);
   const [selectedWeekStart, setSelectedWeekStart] = useState(thisWeekStart);
   const [redeemPromptId, setRedeemPromptId] = useState(null);
+  const [manageMode, setManageMode] = useState(false);
+  const [addingFor, setAddingFor] = useState(null); // personId currently showing the add-chore form
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  // Chore definitions are now live (localStorage) rather than a static
+  // mockData import -- loaded once into state and reloaded after any
+  // add/remove, same "bump a counter to force a redraw" reasoning as the
+  // completion/redemption state below (nothing else would tell React this
+  // page needs to redraw after a localStorage-only change).
+  const [chores, setChores] = useState(() => getChoreDefinitions());
   // Bumped on every toggle/redeem to force a re-render -- completion/
   // redemption state lives in localStorage (src/lib/chores.js), not React
   // state, so nothing else would otherwise tell React this page needs to
@@ -97,7 +113,7 @@ export default function ChoresPage() {
   };
 
   const totals = PERSON_ORDER.map((personId) => {
-    const list = initialChores[personId];
+    const list = chores[personId];
     const done = list.filter((c) => isDoneFor(personId, c)).length;
     return { personId, done, total: list.length };
   });
@@ -110,11 +126,31 @@ export default function ChoresPage() {
     forceRender((n) => n + 1);
   };
 
+  const submitAddChore = (personId) => {
+    if (!draft.text.trim()) return;
+    setChores(addChore(personId, draft));
+    setDraft(EMPTY_DRAFT);
+    setAddingFor(null);
+  };
+
+  const handleRemoveChore = (personId, choreId) => {
+    setChores(removeChore(personId, choreId));
+  };
+
   return (
     <div className="page full-page active" id="page-chores">
       <div className="fp-sidebar">
         <div style={{ marginBottom: '0.4em' }}>
-          <div className="fp-title">Chores</div>
+          <div className="fp-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
+            <span>Chores</span>
+            <button
+              className="add-btn"
+              style={{ padding: '0.05em 0.6em', fontSize: '0.6em' }}
+              onClick={() => { setManageMode((v) => !v); setAddingFor(null); }}
+            >
+              {manageMode ? 'Done editing' : '✏️ Manage chores'}
+            </button>
+          </div>
           <div className="fp-subtitle">{formatWeekLabel(selectedWeekStart)} · {overallDone} of {overallTotal} done</div>
         </div>
 
@@ -178,7 +214,7 @@ export default function ChoresPage() {
         <div className="chore-grid">
           {PERSON_ORDER.map((personId) => {
             const { done, total } = totals.find((t) => t.personId === personId);
-            const { routines, standalone } = groupByRoutine(initialChores[personId]);
+            const { routines, standalone } = groupByRoutine(chores[personId]);
             const chip = (chore) => {
               const doneNow = isDoneFor(personId, chore);
               const dailyWeekCount = !isCurrentWeek && chore.freq === 'Daily'
@@ -187,16 +223,24 @@ export default function ChoresPage() {
                 <div
                   key={chore.id}
                   className={`chore-item${doneNow ? ' done' : ''}`}
-                  style={!isCurrentWeek ? { cursor: 'default', opacity: 0.85 } : undefined}
-                  onClick={() => toggleChore(personId, chore)}
+                  style={!isCurrentWeek && !manageMode ? { cursor: 'default', opacity: 0.85 } : undefined}
+                  onClick={manageMode ? undefined : () => toggleChore(personId, chore)}
                 >
-                  <div className={`chore-cb${doneNow ? ' on' : ''}`} />
-                  <span style={{ marginRight: '0.3em' }}>{CHORE_ICONS[chore.id]}</span>
+                  {!manageMode && <div className={`chore-cb${doneNow ? ' on' : ''}`} />}
+                  <span style={{ marginRight: '0.3em' }}>{CHORE_ICONS[chore.id] || DEFAULT_CHORE_ICON}</span>
                   <div className="chore-text">{chore.text}</div>
                   <div className="chore-freq">
                     {dailyWeekCount !== null ? `${dailyWeekCount}/7 days` : chore.freq}
                     {' · '}<span style={{ color: 'var(--ev-teal-tx, #5DCAA5)' }}>+{chore.points || 0}</span>
                   </div>
+                  {manageMode && (
+                    <span
+                      style={{ marginLeft: '0.5em', color: 'var(--ev-coral-tx, #FF8A78)', cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); handleRemoveChore(personId, chore.id); }}
+                    >
+                      ✕
+                    </span>
+                  )}
                 </div>
               );
             };
@@ -223,6 +267,61 @@ export default function ChoresPage() {
                   );
                 })}
                 {!!standalone.length && standalone.map(chip)}
+
+                {manageMode && addingFor !== personId && (
+                  <button
+                    className="add-btn"
+                    style={{ marginTop: '0.4em', fontSize: '0.82em', justifyContent: 'center' }}
+                    onClick={() => { setAddingFor(personId); setDraft(EMPTY_DRAFT); }}
+                  >
+                    + Add chore
+                  </button>
+                )}
+                {manageMode && addingFor === personId && (
+                  <div style={{ marginTop: '0.4em', display: 'flex', flexDirection: 'column', gap: '0.35em' }}>
+                    <input
+                      className="add-input"
+                      placeholder="Chore name…"
+                      value={draft.text}
+                      autoFocus
+                      onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && submitAddChore(personId)}
+                    />
+                    <div style={{ display: 'flex', gap: '0.35em' }}>
+                      <select
+                        className="add-input"
+                        style={{ flex: 1 }}
+                        value={draft.freq}
+                        onChange={(e) => setDraft((d) => ({ ...d, freq: e.target.value }))}
+                      >
+                        {FREQ_OPTIONS.map((f) => (
+                          <option key={f} value={f} style={{ color: '#1a1a1a', background: '#fff' }}>{f}</option>
+                        ))}
+                      </select>
+                      <input
+                        className="add-input"
+                        style={{ width: '5em' }}
+                        type="number"
+                        min="0"
+                        step="5"
+                        placeholder="pts"
+                        value={draft.points}
+                        onChange={(e) => setDraft((d) => ({ ...d, points: e.target.value }))}
+                      />
+                    </div>
+                    <input
+                      className="add-input"
+                      placeholder="Routine (optional, e.g. Morning routine)…"
+                      value={draft.routine}
+                      onChange={(e) => setDraft((d) => ({ ...d, routine: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && submitAddChore(personId)}
+                    />
+                    <div style={{ display: 'flex', gap: '0.35em' }}>
+                      <button className="add-btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => submitAddChore(personId)}>Add</button>
+                      <button className="add-btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setAddingFor(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -243,13 +342,13 @@ export default function ChoresPage() {
                 }}
               >
                 <span className="chore-dot" style={{ background: people[personId].color, width: '0.7em', height: '0.7em' }} />
-                {people[personId].name} — {pointsBalance(personId, initialChores[personId])} pts
+                {people[personId].name} — {pointsBalance(personId, chores[personId])} pts
               </div>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(13em, 1fr))', gap: '0.6em' }}>
             {rewardCatalog.map((reward) => {
-              const affordableBy = REWARD_KIDS.filter((p) => pointsBalance(p, initialChores[p]) >= reward.cost);
+              const affordableBy = REWARD_KIDS.filter((p) => pointsBalance(p, chores[p]) >= reward.cost);
               const isPrompting = redeemPromptId === reward.id;
               return (
                 <div key={reward.id} className="task-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em', cursor: 'default' }}>

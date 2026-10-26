@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   periodKeyFor, isChoreDone, toggleChoreDone, daysDoneInWeek, totalCompletions,
   pointsEarned, pointsSpent, pointsBalance, redeemReward, redemptionHistory,
+  getChoreDefinitions, addChore, removeChore,
 } from './chores';
 
 // Y/M/D constructor, matching how the app itself builds dates (new Date()
@@ -109,5 +110,44 @@ describe('points and rewards (T-36)', () => {
     redeemReward('bryce', { id: 'r2', title: 'x', cost: 5 });
     expect(pointsBalance('bryce', chores)).toBe(5);
     expect(pointsBalance('emery', chores)).toBe(0); // untouched
+  });
+});
+
+describe('chore definitions (add/remove)', () => {
+  it('falls back to mockData defaults until something is saved', () => {
+    const defs = getChoreDefinitions();
+    expect(defs.bryce.some((c) => c.id === 'ch10')).toBe(true); // "Make bed" from mockData
+  });
+
+  it('adding a chore appears in later reads, with a generated id and defaults filled in', () => {
+    addChore('bryce', { text: 'Walk the dog', freq: 'Daily', routine: 'Morning routine', points: '8' });
+    const defs = getChoreDefinitions();
+    const added = defs.bryce.find((c) => c.text === 'Walk the dog');
+    expect(added).toBeTruthy();
+    expect(added.freq).toBe('Daily');
+    expect(added.routine).toBe('Morning routine');
+    expect(added.points).toBe(8); // coerced from the string an <input> would give
+    expect(added.id).toBeTruthy();
+  });
+
+  it('an empty/blank routine is stored as null, not an empty string', () => {
+    addChore('emery', { text: 'Pack lunch', freq: 'Daily', routine: '  ', points: 5 });
+    const added = getChoreDefinitions().emery.find((c) => c.text === 'Pack lunch');
+    expect(added.routine).toBeNull();
+  });
+
+  it('removing a chore drops only that one, leaving the rest untouched', () => {
+    const before = getChoreDefinitions().trey.length;
+    removeChore('trey', 'ch1'); // "Take out trash"
+    const after = getChoreDefinitions();
+    expect(after.trey).toHaveLength(before - 1);
+    expect(after.trey.some((c) => c.id === 'ch1')).toBe(false);
+    expect(after.trey.some((c) => c.id === 'ch2')).toBe(true); // untouched
+  });
+
+  it('adding/removing for one person never touches another person\'s list', () => {
+    addChore('bryce', { text: 'x', freq: 'Daily', routine: '', points: 5 });
+    const after = getChoreDefinitions();
+    expect(after.emery).toHaveLength(5); // mockData's original Emery count, untouched
   });
 });
