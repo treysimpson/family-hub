@@ -3,13 +3,23 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { hasBudgetPin, resetBudgetPin } from '../PinGate';
 import { LEAGUES, getSportsSettings, saveSportsSettings } from '../../lib/sports';
+import { buildBugReportMailto } from '../../lib/bugReport';
 
 export default function SettingsPanel() {
-  const { settingsPanelOpen, theme, setTheme } = useApp();
+  const { settingsPanelOpen, theme, setTheme, page } = useApp();
   const { isSignedIn, signIn, signOut, signingIn, authError } = useAuth();
   const [pinReset, setPinReset] = useState(false);
   const [sportsSettings, setSportsSettings] = useState(() => getSportsSettings());
   const [teamInput, setTeamInput] = useState('');
+  const [bugText, setBugText] = useState('');
+  const [bugSent, setBugSent] = useState(false);
+
+  const sendBugReport = () => {
+    if (!bugText.trim()) return;
+    window.location.href = buildBugReportMailto(bugText, { page, theme });
+    setBugSent(true);
+    setBugText('');
+  };
 
   const toggleLeague = (id) => {
     const next = {
@@ -116,6 +126,32 @@ export default function SettingsPanel() {
                 {name} ✕
               </div>
             ))}
+          </div>
+        )}
+      </div>
+      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
+        <div className="settings-label">Report a problem</div>
+        <div style={{ fontSize: '0.78em', color: 'var(--text-muted)' }}>
+          Describe what went wrong — this opens your email app addressed to the family agent, same inbox as everything else.
+        </div>
+        <textarea
+          className="add-input"
+          style={{ height: 'auto', minHeight: '3.5em', resize: 'vertical', fontFamily: 'inherit' }}
+          placeholder="e.g. the Groceries list didn't save my item…"
+          value={bugText}
+          onChange={(e) => { setBugText(e.target.value); setBugSent(false); }}
+        />
+        <button
+          className="add-btn"
+          style={{ justifyContent: 'center', width: '100%' }}
+          onClick={sendBugReport}
+          disabled={!bugText.trim()}
+        >
+          Email this report
+        </button>
+        {bugSent && (
+          <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>
+            Opened your email app with the report filled in — tap send there to finish.
           </div>
         )}
       </div>
