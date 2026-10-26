@@ -53,7 +53,10 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35em', marginBottom: '0.6em', flexShrink: 0 }}>
+        <div
+          style={{ display: 'flex', gap: '0.35em', marginBottom: '0.6em', flexShrink: 0 }}
+          title="Visual only for now — one shared calendar has no per-person signal to actually filter by yet"
+        >
           {PERSON_PILLS.map((p) => (
             <div
               key={p.id}

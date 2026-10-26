@@ -54,12 +54,11 @@ export default function TopBar() {
             <div className="weather-sub">Westminster</div>
           </div>
         </div>
-        <div className="notif-btn" onClick={toggleAgentPanel}>
+        <div className="notif-btn" onClick={toggleAgentPanel} title="What you can email the agent">
           <svg width="55%" height="55%" viewBox="0 0 16 16" fill="none">
             <path d="M8 1.5C5.79 1.5 4 3.29 4 5.5v2.5L2.5 10h11L12 8V5.5C12 3.29 10.21 1.5 8 1.5Z" stroke="#888780" strokeWidth="1.2" strokeLinejoin="round" />
             <path d="M6.5 11.5a1.5 1.5 0 0 0 3 0" stroke="#888780" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          <div className="notif-badge">2</div>
         </div>
         <div className="settings-btn" onClick={toggleSettingsPanel} title="Settings">⚙️</div>
       </div>

@@ -4,11 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { hasBudgetPin, resetBudgetPin } from '../PinGate';
 import { LEAGUES, getSportsSettings, saveSportsSettings } from '../../lib/sports';
 import { buildBugReportMailto } from '../../lib/bugReport';
+import HelpPanel from './HelpPanel';
 
 export default function SettingsPanel() {
   const { settingsPanelOpen, theme, setTheme, page } = useApp();
   const { isSignedIn, signIn, signOut, signingIn, authError } = useAuth();
   const [pinReset, setPinReset] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sportsSettings, setSportsSettings] = useState(() => getSportsSettings());
   const [teamInput, setTeamInput] = useState('');
   const [bugText, setBugText] = useState('');
@@ -48,8 +50,14 @@ export default function SettingsPanel() {
   };
 
   return (
+    <>
     <div id="settings-panel" className={settingsPanelOpen ? 'show' : ''}>
       <div className="settings-title">Settings</div>
+      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.3em' }}>
+        <button className="add-btn" style={{ justifyContent: 'center', width: '100%' }} onClick={() => setHelpOpen(true)}>
+          ❔ How this works
+        </button>
+      </div>
       <div className="settings-row">
         <div className="settings-label">Theme</div>
         <div className="theme-toggle">
@@ -156,5 +164,11 @@ export default function SettingsPanel() {
         )}
       </div>
     </div>
+    {/* Rendered as a sibling of #settings-panel (a narrow sidebar box), not
+        nested inside it, so HelpPanel's full-screen overlay positions
+        against .aspect-wrap like Screensaver does, instead of being
+        clipped to the settings sidebar's own small bounding box. */}
+    <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   );
 }

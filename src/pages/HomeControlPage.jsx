@@ -42,6 +42,16 @@ export default function HomeControlPage() {
 
   return (
     <div className="page active" id="page-home-control">
+      <div
+        style={{
+          margin: '0 0 0.6em', padding: '0.5em 0.8em', borderRadius: 'var(--card-radius)',
+          background: 'var(--bg-card)', fontSize: '0.78em', color: 'var(--text-muted)',
+          display: 'flex', alignItems: 'center', gap: '0.5em',
+        }}
+      >
+        <span>🔧</span>
+        <span>Preview — these toggles don't control real devices yet. Smart-home integration is planned for Phase 4 (needs a Raspberry Pi running Home Assistant).</span>
+      </div>
       <div className="hc-quickbar">
         {scenes.map((scene) => (
           <div

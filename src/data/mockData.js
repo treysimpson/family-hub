@@ -276,7 +276,13 @@ export const scenes = [
 ];
 
 // ── Agent inbox ──
+// Illustrative only — there's no live feed of what the email agent has
+// actually done recently (it writes straight to Tasks/Calendar/Sheets, not
+// to anywhere the app can read a log from). AgentPanel.jsx labels these
+// clearly as examples rather than real unread notifications, since showing
+// them as if they were real pending items would be misleading.
 export const agentInbox = [
-  { from: 'via email · today 6:14am', msg: '"Add dentist appt for Emery Mar 21 at 2pm" — added to calendar ✓' },
-  { from: 'via email · yesterday 9:02pm', msg: '"Add milk to groceries" — added to list ✓' },
+  { from: 'Example', msg: '"Add dentist appt for Emery Mar 21 at 2pm" — added to calendar ✓' },
+  { from: 'Example', msg: '"Add milk to groceries" — added to list ✓' },
+  { from: 'Example', msg: '"Beryl spent $120 on shoes" — deducted from her Fun Money ✓' },
 ];

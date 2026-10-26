@@ -64,7 +64,7 @@ export default function ChoresPage() {
           <div className="fp-subtitle">{formatWeekLabel(selectedWeekStart)} · {overallDone} of {overallTotal} done</div>
         </div>
 
-        <div className="chore-progress-box">
+        <div className="chore-progress-box" title="Daily chores reset each morning, Weekly each Sunday, Monthly each 1st — no need to re-check them, they just clear on their own">
           <div className="chore-progress-label">Progress this week</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
             {totals.map(({ personId, done, total }) => (
@@ -84,7 +84,7 @@ export default function ChoresPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: '1em' }}>
+        <div style={{ marginTop: '1em' }} title="A simple running count of every chore ever checked off — not tied to a points or reward system yet">
           <div className="chore-progress-label">All-time completions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3em', fontSize: '0.85em' }}>
             {PERSON_ORDER.map((personId) => (
