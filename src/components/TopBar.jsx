@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { id: 'home-control', label: 'Home Control' },
   { id: 'weather', label: 'Weather' },
   { id: 'budget', label: 'Budget' },
+  { id: 'sports', label: 'Sports' },
 ];
 
 function useClock() {

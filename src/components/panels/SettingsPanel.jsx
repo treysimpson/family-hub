@@ -2,11 +2,40 @@ import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { hasBudgetPin, resetBudgetPin } from '../PinGate';
+import { LEAGUES, getSportsSettings, saveSportsSettings } from '../../lib/sports';
 
 export default function SettingsPanel() {
   const { settingsPanelOpen, theme, setTheme } = useApp();
   const { isSignedIn, signIn, signOut, signingIn, authError } = useAuth();
   const [pinReset, setPinReset] = useState(false);
+  const [sportsSettings, setSportsSettings] = useState(() => getSportsSettings());
+  const [teamInput, setTeamInput] = useState('');
+
+  const toggleLeague = (id) => {
+    const next = {
+      ...sportsSettings,
+      leagueIds: sportsSettings.leagueIds.includes(id)
+        ? sportsSettings.leagueIds.filter((l) => l !== id)
+        : [...sportsSettings.leagueIds, id],
+    };
+    setSportsSettings(next);
+    saveSportsSettings(next);
+  };
+
+  const addTeam = () => {
+    const name = teamInput.trim();
+    if (!name || sportsSettings.teamNames.includes(name)) { setTeamInput(''); return; }
+    const next = { ...sportsSettings, teamNames: [...sportsSettings.teamNames, name] };
+    setSportsSettings(next);
+    saveSportsSettings(next);
+    setTeamInput('');
+  };
+
+  const removeTeam = (name) => {
+    const next = { ...sportsSettings, teamNames: sportsSettings.teamNames.filter((t) => t !== name) };
+    setSportsSettings(next);
+    saveSportsSettings(next);
+  };
 
   return (
     <div id="settings-panel" className={settingsPanelOpen ? 'show' : ''}>
@@ -52,6 +81,41 @@ export default function SettingsPanel() {
         {pinReset && (
           <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>
             PIN cleared — you'll be asked to set a new one next time you open Budget.
+          </div>
+        )}
+      </div>
+      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
+        <div className="settings-label">Sports — leagues to follow</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4em' }}>
+          {LEAGUES.map((l) => (
+            <div
+              key={l.id}
+              className={`fpill${sportsSettings.leagueIds.includes(l.id) ? ' on' : ''}`}
+              onClick={() => toggleLeague(l.id)}
+            >
+              {l.label}
+            </div>
+          ))}
+        </div>
+        <div className="settings-label" style={{ marginTop: '0.4em' }}>Your teams (highlighted at the top of Sports)</div>
+        <div style={{ display: 'flex', gap: '0.4em' }}>
+          <input
+            className="add-input"
+            style={{ flex: 1 }}
+            placeholder="e.g. Broncos, Avalanche…"
+            value={teamInput}
+            onChange={(e) => setTeamInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addTeam()}
+          />
+          <button className="add-btn" onClick={addTeam}>Add</button>
+        </div>
+        {!!sportsSettings.teamNames.length && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4em' }}>
+            {sportsSettings.teamNames.map((name) => (
+              <div key={name} className="fpill on" style={{ cursor: 'pointer' }} onClick={() => removeTeam(name)} title="Tap to remove">
+                {name} ✕
+              </div>
+            ))}
           </div>
         )}
       </div>
