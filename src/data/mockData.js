@@ -196,34 +196,56 @@ export const storeIcons = { grocery: '🛒', costco: '📦', other: '🏪' };
 export const frequentGroceryItems = ['🥛 Milk', '🥚 Eggs', '🍞 Bread', '🧀 Cheese', '🍌 Bananas', '🐔 Chicken', '💧 Sparkling water', '🍎 Apples', '🍝 Pasta', '🧴 Dish soap'];
 
 // ── Chores ──
+// `routine` groups chores the way the Sense/KidKarma-style chore apps do
+// (T-36's "Chores & Rewards" mockup, 2026-10-26) -- null means "not part of
+// a named routine," shown under its frequency instead. `points` feeds the
+// Rewards catalog below (src/lib/chores.js tallies them from the
+// completion log). Flat point values by rough effort, Trey's call to
+// retune later -- this is a first pass, not a finished point economy.
+// `done`/`icon` (the icon lives in ChoresPage.jsx's CHORE_ICONS) are
+// definitions only; actual completion state is 100% localStorage (T-36).
 export const initialChores = {
   trey: [
-    { id: 'ch1', text: 'Take out trash', freq: 'Weekly', done: true },
-    { id: 'ch2', text: 'Vacuum living room', freq: 'Weekly', done: true },
-    { id: 'ch3', text: 'Mow lawn', freq: 'Weekly', done: true },
-    { id: 'ch4', text: 'Clean garage', freq: 'Monthly', done: false },
+    { id: 'ch1', text: 'Take out trash', freq: 'Weekly', routine: 'Weekend reset', points: 5 },
+    { id: 'ch2', text: 'Vacuum living room', freq: 'Weekly', routine: 'Weekend reset', points: 5 },
+    { id: 'ch3', text: 'Mow lawn', freq: 'Weekly', routine: 'Weekend reset', points: 10 },
+    { id: 'ch4', text: 'Clean garage', freq: 'Monthly', routine: null, points: 15 },
   ],
   beryl: [
-    { id: 'ch5', text: 'Laundry', freq: 'Weekly', done: true },
-    { id: 'ch6', text: 'Grocery shopping', freq: 'Weekly', done: true },
-    { id: 'ch7', text: 'Clean bathrooms', freq: 'Weekly', done: true },
-    { id: 'ch8', text: 'Meal prep', freq: 'Weekly', done: true },
-    { id: 'ch9', text: 'Deep clean kitchen', freq: 'Monthly', done: false },
+    { id: 'ch5', text: 'Laundry', freq: 'Weekly', routine: 'Household weekly', points: 5 },
+    { id: 'ch6', text: 'Grocery shopping', freq: 'Weekly', routine: 'Household weekly', points: 5 },
+    { id: 'ch7', text: 'Clean bathrooms', freq: 'Weekly', routine: 'Household weekly', points: 5 },
+    { id: 'ch8', text: 'Meal prep', freq: 'Weekly', routine: 'Household weekly', points: 5 },
+    { id: 'ch9', text: 'Deep clean kitchen', freq: 'Monthly', routine: null, points: 15 },
   ],
   bryce: [
-    { id: 'ch10', text: 'Make bed', freq: 'Daily', done: true },
-    { id: 'ch11', text: 'Empty dishwasher', freq: 'Daily', done: false },
-    { id: 'ch12', text: 'Tidy bedroom', freq: 'Weekly', done: false },
-    { id: 'ch13', text: 'Feed dog', freq: 'Daily', done: false },
+    { id: 'ch10', text: 'Make bed', freq: 'Daily', routine: 'Morning routine', points: 5 },
+    { id: 'ch11', text: 'Empty dishwasher', freq: 'Daily', routine: 'Morning routine', points: 5 },
+    { id: 'ch13', text: 'Feed dog', freq: 'Daily', routine: 'Morning routine', points: 5 },
+    { id: 'ch12', text: 'Tidy bedroom', freq: 'Weekly', routine: null, points: 5 },
   ],
   emery: [
-    { id: 'ch14', text: 'Make bed', freq: 'Daily', done: true },
-    { id: 'ch15', text: 'Set dinner table', freq: 'Daily', done: false },
-    { id: 'ch16', text: 'Tidy bedroom', freq: 'Weekly', done: false },
-    { id: 'ch17', text: 'Water plants', freq: 'Weekly', done: false },
-    { id: 'ch18', text: 'Wipe down counters', freq: 'Daily', done: false },
+    { id: 'ch14', text: 'Make bed', freq: 'Daily', routine: 'Daily routine', points: 5 },
+    { id: 'ch15', text: 'Set dinner table', freq: 'Daily', routine: 'Daily routine', points: 5 },
+    { id: 'ch18', text: 'Wipe down counters', freq: 'Daily', routine: 'Daily routine', points: 5 },
+    { id: 'ch16', text: 'Tidy bedroom', freq: 'Weekly', routine: null, points: 5 },
+    { id: 'ch17', text: 'Water plants', freq: 'Weekly', routine: null, points: 5 },
   ],
 };
+
+// Only Bryce/Emery redeem rewards -- Trey/Beryl's chores are tracked the
+// same way (routines, points) but adult chores aren't reward-motivated.
+// Starting catalog lifted straight from the mockup; which rewards exist and
+// what they cost is exactly the kind of thing to retune per T-36.
+export const REWARD_KIDS = ['bryce', 'emery'];
+export const rewardCatalog = [
+  { id: 'r1', title: '🍿 Pick Friday movie night', cost: 15 },
+  { id: 'r2', title: '📱 30 extra min of screen time', cost: 20 },
+  { id: 'r3', title: '🌙 Stay up 15 min past bedtime', cost: 15 },
+  { id: 'r4', title: '🥞 Choose Sunday breakfast', cost: 10 },
+  { id: 'r5', title: '🙅 Skip one chore this week', cost: 30 },
+  { id: 'r6', title: '🎳 Family outing of their choice', cost: 60 },
+];
 
 export const choreProgressColors = { trey: '#1D9E75', beryl: '#7F77DD', bryce: '#F0997B', emery: '#AFA9EC' };
 

@@ -69,14 +69,74 @@ export function daysDoneInWeek(personId, choreId, weekStart) {
   return count;
 }
 
-// All-time completion count across every chore -- a simple, honest "things
-// this person has checked off" running total, not a designed points/reward
-// system (what a completion is worth, and whether it ties to a reward, is
-// still an open question -- see T-36 in family-hub-project.md). Flat +1 per
-// completion, derived from the completion log itself rather than a separate
-// stored counter, so it can never drift out of sync with the actual record.
+// All-time completion count across every chore -- a simple "things checked
+// off" running total, independent of points (a Daily chore checked off 20
+// times counts 20 here even though it's worth the same points each time).
 export function totalCompletions(personId) {
   const data = load();
   const chores = data[personId] || {};
   return Object.values(chores).reduce((sum, periods) => sum + Object.keys(periods).length, 0);
+}
+
+// ---- Rewards (T-36, added 2026-10-26) ----
+// First pass at the points/reward half mockData.js's `rewardCatalog`
+// pairs with -- flat points per chore (from each chore's own `points`
+// field), spent against a reward catalog Trey curates. Retune-later by
+// design: point values and what's on the reward list are both just a
+// starting guess, not a finished point economy.
+
+const REDEMPTIONS_KEY = 'fh-chores-redemptions';
+
+function loadRedemptions() {
+  try {
+    const raw = localStorage.getItem(REDEMPTIONS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRedemptions(data) {
+  try {
+    localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(data));
+  } catch {
+    // Same reasoning as save() above -- non-fatal if storage is unavailable.
+  }
+}
+
+// Needs the chore *list* (not just ids) since the completion log only
+// stores {choreId: {period: true}}, not each chore's point value -- that
+// lives in mockData.js's initialChores, which the caller already has.
+export function pointsEarned(personId, chores) {
+  const data = load();
+  const record = data[personId] || {};
+  return chores.reduce((sum, c) => {
+    const periods = record[c.id];
+    return sum + (periods ? Object.keys(periods).length * (c.points || 0) : 0);
+  }, 0);
+}
+
+export function pointsSpent(personId) {
+  const redemptions = loadRedemptions();
+  return (redemptions[personId] || []).reduce((sum, r) => sum + r.cost, 0);
+}
+
+export function pointsBalance(personId, chores) {
+  return pointsEarned(personId, chores) - pointsSpent(personId);
+}
+
+export function redemptionHistory(personId) {
+  return [...(loadRedemptions()[personId] || [])].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export function redeemReward(personId, reward) {
+  const redemptions = loadRedemptions();
+  if (!redemptions[personId]) redemptions[personId] = [];
+  redemptions[personId].push({
+    rewardId: reward.id,
+    title: reward.title,
+    cost: reward.cost,
+    date: toDateKey(new Date()),
+  });
+  saveRedemptions(redemptions);
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { periodKeyFor, isChoreDone, toggleChoreDone, daysDoneInWeek, totalCompletions } from './chores';
+import {
+  periodKeyFor, isChoreDone, toggleChoreDone, daysDoneInWeek, totalCompletions,
+  pointsEarned, pointsSpent, pointsBalance, redeemReward, redemptionHistory,
+} from './chores';
 
 // Y/M/D constructor, matching how the app itself builds dates (new Date()
 // with no args, then date-math via setDate()) -- an ISO date *string* like
@@ -71,5 +74,40 @@ describe('totalCompletions', () => {
     expect(totalCompletions('bryce')).toBe(2);
     toggleChoreDone('bryce', 'ch10', '2026-10-26'); // un-toggle
     expect(totalCompletions('bryce')).toBe(1);
+  });
+});
+
+describe('points and rewards (T-36)', () => {
+  const chores = [{ id: 'ch10', points: 5 }, { id: 'ch11', points: 10 }];
+
+  it('sums each completion by that chore\'s own point value', () => {
+    toggleChoreDone('bryce', 'ch10', '2026-10-25'); // +5
+    toggleChoreDone('bryce', 'ch10', '2026-10-26'); // +5 (a different period, both count)
+    toggleChoreDone('bryce', 'ch11', '2026-10-26'); // +10
+    expect(pointsEarned('bryce', chores)).toBe(20);
+  });
+
+  it('ignores a chore\'s points if a different chore with that id isn\'t passed in', () => {
+    toggleChoreDone('bryce', 'ch10', '2026-10-26');
+    expect(pointsEarned('bryce', [])).toBe(0); // caller didn't pass ch10's point value at all
+  });
+
+  it('redeeming deducts from the balance and is reflected in history', () => {
+    toggleChoreDone('emery', 'ch10', '2026-10-26'); // +5
+    toggleChoreDone('emery', 'ch11', '2026-10-26'); // +10
+    expect(pointsBalance('emery', chores)).toBe(15);
+
+    redeemReward('emery', { id: 'r1', title: 'Pick movie night', cost: 10 });
+    expect(pointsSpent('emery')).toBe(10);
+    expect(pointsBalance('emery', chores)).toBe(5);
+    expect(redemptionHistory('emery')).toHaveLength(1);
+    expect(redemptionHistory('emery')[0].title).toBe('Pick movie night');
+  });
+
+  it('keeps balances independent per person', () => {
+    toggleChoreDone('bryce', 'ch11', '2026-10-26'); // +10
+    redeemReward('bryce', { id: 'r2', title: 'x', cost: 5 });
+    expect(pointsBalance('bryce', chores)).toBe(5);
+    expect(pointsBalance('emery', chores)).toBe(0); // untouched
   });
 });
