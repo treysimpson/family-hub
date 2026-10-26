@@ -10,9 +10,10 @@ import {
 import {
   fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits, fetchFunMoney, fetchOrderItems,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
-  setFixedBillStatus,
+  setFixedBillStatus, updateTransactionNotes,
 } from '../lib/googleSheets';
 import { applyCardCredits, fixedBillKey } from '../lib/cardCredits';
+import { addTag, removeTag, hasTag, HOUSE_MAINTENANCE_TAG } from '../lib/notesTags';
 import { useAuth } from './AuthContext';
 import {
   monthGrid as mockMonthGrid, weekDays as mockWeekDays, next5Days as mockNext5Days,
@@ -288,6 +289,27 @@ export function AppProvider({ children }) {
     }
   }, [accessToken, fixedBillMerchants]);
 
+  // Flips the "#house-maintenance" tag (see src/lib/notesTags.js, T-32) in
+  // this transaction's Notes cell. Single-row, not a merchant-wide rule like
+  // recategorize/rename -- a house visit's merchant (e.g. "Colorado Service
+  // Techs") also does unrelated non-maintenance charges, so tagging has to
+  // be per-transaction.
+  const toggleHouseMaintenanceTag = useCallback(async (transaction) => {
+    const wasTagged = hasTag(transaction.notes, HOUSE_MAINTENANCE_TAG);
+    const previousNotes = transaction.notes;
+    const nextNotes = wasTagged
+      ? removeTag(previousNotes, HOUSE_MAINTENANCE_TAG)
+      : addTag(previousNotes, HOUSE_MAINTENANCE_TAG);
+    setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, notes: nextNotes } : t)));
+    try {
+      await updateTransactionNotes(accessToken, transaction.row, nextNotes);
+      setBudgetActionError(null);
+    } catch (err) {
+      setBudgetTransactions((prev) => prev.map((t) => (t.row === transaction.row ? { ...t, notes: previousNotes } : t)));
+      setBudgetActionError(err.message);
+    }
+  }, [accessToken]);
+
   const refetchTasks = useCallback(async () => {
     if (!accessToken || !taskListIds) return;
     const all = [];
@@ -512,7 +534,7 @@ export function AppProvider({ children }) {
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
-    toggleFixedBill, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
+    toggleFixedBill, toggleHouseMaintenanceTag, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

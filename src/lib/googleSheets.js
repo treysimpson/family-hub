@@ -122,6 +122,13 @@ export async function updateTransactionCategory(accessToken, row, category, spre
   await writeRange_(accessToken, spreadsheetId, `Transactions!E${row}`, [category]);
 }
 
+// Notes lives in column F of Transactions -- also doubles as the storage
+// for lightweight cross-category tags (see src/lib/notesTags.js, e.g. the
+// house-maintenance tag, T-32) so a tag toggle doesn't need a schema change.
+export async function updateTransactionNotes(accessToken, row, notes, spreadsheetId = BUDGET_SPREADSHEET_ID) {
+  await writeRange_(accessToken, spreadsheetId, `Transactions!F${row}`, [notes]);
+}
+
 // Merchant lives in column C of Transactions.
 export async function updateTransactionMerchant(accessToken, row, merchant, spreadsheetId = BUDGET_SPREADSHEET_ID) {
   await writeRange_(accessToken, spreadsheetId, `Transactions!C${row}`, [merchant]);

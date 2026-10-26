@@ -7,6 +7,7 @@ import CategoryTrendChart from '../components/CategoryTrendChart';
 import BudgetCharts from '../components/BudgetCharts';
 import HowToPanel from '../components/panels/HowToPanel';
 import { fixedBillKey } from '../lib/cardCredits';
+import { hasTag, HOUSE_MAINTENANCE_TAG } from '../lib/notesTags';
 
 function formatCurrency(amount) {
   return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -104,11 +105,12 @@ export default function BudgetPage() {
     selectedBudgetYear, setSelectedBudgetYear, yearCategoryTotals, yearTotal,
     budgetOneTimeTotal, budgetReimbursableTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError, toggleFixedBill,
-    funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
+    toggleHouseMaintenanceTag, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
   } = useApp();
   const [unlocked, setUnlocked] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [showTreyWork, setShowTreyWork] = useState(false);
+  const [showHouseMaintenance, setShowHouseMaintenance] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
@@ -244,6 +246,17 @@ export default function BudgetPage() {
   const treyWorkTransactions = [...budgetTransactions]
     .filter((t) => t.category === 'trey-work')
     .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  // House-upkeep spend (T-32) spans "household" (routine, e.g. a $99 HVAC
+  // check) and "one-time" (a big job like a full HVAC replacement), so this
+  // is a tag read off Notes (see src/lib/notesTags.js), not a category --
+  // it's a view on top of totals that already count these rows normally,
+  // same spirit as the "Fixed" badge. All-time like treyWorkTransactions
+  // above, since maintenance is lumpy, not a monthly thing.
+  const houseMaintenanceTransactions = [...budgetTransactions]
+    .filter((t) => hasTag(t.notes, HOUSE_MAINTENANCE_TAG))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  const houseMaintenanceTotal = houseMaintenanceTransactions.reduce((sum, t) => sum + t.amount, 0);
 
   // Target/Costco/Amazon transactions still sitting as a plain card-alert
   // guess — no itemized split, no majority-category match — because no
@@ -393,6 +406,21 @@ export default function BudgetPage() {
             </div>
             <div style={{ fontSize: '1.1em', fontWeight: 'var(--font-weight-heading)' }}>
               {formatCurrency(budgetReimbursableTotal)}
+            </div>
+          </div>
+        )}
+
+        {houseMaintenanceTotal > 0 && (
+          <div
+            className="card tappable"
+            style={{ marginTop: '0.6em', padding: '0.6em 0.8em', cursor: 'pointer' }}
+            onClick={() => setShowHouseMaintenance((v) => !v)}
+          >
+            <div style={{ fontSize: '0.72em', color: 'var(--text-muted)' }}>
+              House maintenance, all-time — tap to view all
+            </div>
+            <div style={{ fontSize: '1.1em', fontWeight: 'var(--font-weight-heading)' }}>
+              {formatCurrency(houseMaintenanceTotal)}
             </div>
           </div>
         )}
@@ -606,6 +634,31 @@ export default function BudgetPage() {
             </>
           )}
 
+          {showHouseMaintenance && (
+            <>
+              <div className="task-section-head">
+                All house-maintenance tagged transactions ({houseMaintenanceTransactions.length})
+              </div>
+              {houseMaintenanceTransactions.map((t) => (
+                <div key={t.row} className="task-item">
+                  <div>
+                    <div className="task-text">{t.merchant}</div>
+                    <div className="task-meta">
+                      <span className="task-due">{t.date}{t.card ? ` · ${t.card}` : ''}</span>
+                      <span className="task-tag tag-family">{formatCategoryLabel(t.category)}</span>
+                    </div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', fontWeight: 'var(--font-weight-heading)' }}>
+                    {formatCurrency(t.amount)}
+                  </div>
+                </div>
+              ))}
+              {!houseMaintenanceTransactions.length && (
+                <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No house-maintenance tagged transactions yet.</div>
+              )}
+            </>
+          )}
+
           <div className="task-section-head" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5em', justifyContent: 'space-between' }}>
             <span>
               {isRangeActive
@@ -665,6 +718,7 @@ export default function BudgetPage() {
             const hasDetails = !!items.length;
             const showingDetails = detailsRow === t.row;
             const isFixedBill = fixedBillMerchants.includes(fixedBillKey(t));
+            const isHouseMaintenance = hasTag(t.notes, HOUSE_MAINTENANCE_TAG);
             const isExpectedCredit = !!t.isExpectedCredit;
             const coveringCredit = expectedCreditByChargeRow.get(t.row);
 
@@ -775,6 +829,13 @@ export default function BudgetPage() {
                       >
                         {isFixedBill ? 'Not a fixed bill' : 'Mark fixed bill'}
                       </button>
+                      <button
+                        className="add-btn"
+                        style={{ padding: '0.15em 0.5em', fontSize: '0.85em' }}
+                        onClick={(e) => { e.stopPropagation(); toggleHouseMaintenanceTag(t); setEditingRow(null); }}
+                      >
+                        {isHouseMaintenance ? 'Not maintenance' : 'Tag house maintenance'}
+                      </button>
                       </>
                     ) : (
                       <span className="task-tag tag-family">{formatCategoryLabel(t.category)}</span>
@@ -782,6 +843,11 @@ export default function BudgetPage() {
                     {isFixedBill && !isEditingCategory && (
                       <span className="task-tag" style={{ background: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}>
                         Fixed
+                      </span>
+                    )}
+                    {isHouseMaintenance && !isEditingCategory && (
+                      <span className="task-tag" style={{ background: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}>
+                        🔧 Maintenance
                       </span>
                     )}
                     {isReturn && (
