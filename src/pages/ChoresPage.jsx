@@ -3,7 +3,7 @@ import { initialChores, choreProgressColors, people, REWARD_KIDS, rewardCatalog 
 import { toDateKey, startOfWeek, addDays } from '../lib/dateGrid';
 import {
   periodKeyFor, isChoreDone, toggleChoreDone, daysDoneInWeek, totalCompletions,
-  pointsBalance, redeemReward,
+  pointsBalance, redeemReward, redemptionHistory,
 } from '../lib/chores';
 
 const PERSON_ORDER = ['trey', 'beryl', 'bryce', 'emery'];
@@ -279,6 +279,28 @@ export default function ChoresPage() {
               );
             })}
           </div>
+
+          {(() => {
+            const history = REWARD_KIDS
+              .flatMap((p) => redemptionHistory(p).map((r) => ({ ...r, personId: p })))
+              .sort((a, b) => (a.date < b.date ? 1 : -1))
+              .slice(0, 8);
+            if (!history.length) return null;
+            return (
+              <div style={{ marginTop: '1em', paddingTop: '0.8em', borderTop: '0.5px solid var(--border-divider)' }}>
+                <div className="chore-progress-label">Recently redeemed</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3em' }}>
+                  {history.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', fontSize: '0.82em' }}>
+                      <span className="chore-dot" style={{ background: people[r.personId].color, width: '0.6em', height: '0.6em', flexShrink: 0 }} />
+                      <span>{people[r.personId].name} redeemed <strong>{r.title}</strong></span>
+                      <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', flexShrink: 0 }}>{r.date} · {r.cost} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
