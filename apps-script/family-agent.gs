@@ -1237,7 +1237,19 @@ function matchWorkExpenses_(spreadsheet) {
   for (let w = 1; w < workData.length; w++) {
     if (workData[w][6] === true) continue; // already matched
     const expenseId = workData[w][0];
-    const date = String(workData[w][1] || '');
+    // normalizeSheetDate_, not a bare String() -- this column was written
+    // as a "yyyy-MM-dd" string (reformatUsDate_) but Sheets auto-detects
+    // date-shaped strings and stores them as its own date type regardless
+    // (same gotcha documented on normalizeSheetDate_'s other call sites),
+    // so a plain String() on it gives Date.prototype.toString()'s verbose
+    // local-time format, not the date-only string being compared against
+    // below. new Date() on a *local*-time string parses as local midnight,
+    // while txTimes[t] (computed the same way everywhere else in this
+    // file) parses a *date-only* "yyyy-MM-dd" string as UTC midnight --
+    // left inconsistent, that's a silent several-hour skew between the two
+    // sides of the daysApart comparison a few lines down, which could flip
+    // a near-WORK_EXPENSE_DATE_TOLERANCE_DAYS-boundary match either way.
+    const date = normalizeSheetDate_(workData[w][1]);
     const amount = Number(workData[w][2]);
     const currency = String(workData[w][3] || 'USD');
     if (!date || isNaN(amount)) continue;
