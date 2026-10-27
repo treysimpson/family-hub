@@ -17,6 +17,11 @@ const PERSON_PILLS = [
   { id: 'kids', label: 'Bryce & Emery', cls: 'ckids' },
   { id: 'family', label: 'Family', cls: 'cfamily' },
 ];
+// 'all' is a meta/select-all control, not a real person -- kept out of the
+// tracked Set itself (see togglePerson/the "on" check below) so its own
+// highlighted state can be derived purely from whether every real person is
+// selected, rather than needing to be kept in sync by every other toggle.
+const PERSON_IDS = PERSON_PILLS.filter((p) => p.id !== 'all').map((p) => p.id);
 
 export default function CalendarPage() {
   const { openEvent, calendarViews } = useApp();
@@ -26,13 +31,13 @@ export default function CalendarPage() {
   // Person filter pills stay visual-only: a single primary Google Calendar has no
   // reliable per-family-member data to filter by (would need separate per-person
   // calendars merged together — a possible future enhancement).
-  const [activePersons, setActivePersons] = useState(() => new Set(PERSON_PILLS.map((p) => p.id)));
+  const [activePersons, setActivePersons] = useState(() => new Set(PERSON_IDS));
 
   const togglePerson = (id) => {
     setActivePersons((prev) => {
       const next = new Set(prev);
       if (id === 'all') {
-        return next.size === PERSON_PILLS.length ? new Set() : new Set(PERSON_PILLS.map((p) => p.id));
+        return next.size === PERSON_IDS.length ? new Set() : new Set(PERSON_IDS);
       }
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -60,7 +65,7 @@ export default function CalendarPage() {
           {PERSON_PILLS.map((p) => (
             <div
               key={p.id}
-              className={`cpill ${p.cls}${activePersons.has(p.id) || (p.id === 'all' && activePersons.size === PERSON_PILLS.length) ? ' on' : ''}`}
+              className={`cpill ${p.cls}${(p.id === 'all' ? activePersons.size === PERSON_IDS.length : activePersons.has(p.id)) ? ' on' : ''}`}
               onClick={() => togglePerson(p.id)}
             >
               {p.label}
