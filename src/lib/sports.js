@@ -63,6 +63,16 @@ function normalizeEvent(event) {
   } : null);
 
   const status = event.status || {};
+  // ESPN's scoreboard response already includes this on every event (no
+  // separate API call needed) -- an array of { market, names } per outlet
+  // carrying it (e.g. national network, a team's regional sports network,
+  // a streaming service), sometimes more than one for the same game. Joined
+  // into one display string rather than kept structured, since there's
+  // nothing here to pick "the" channel for a given viewer -- which market
+  // is relevant depends on where they live, which this app has no concept
+  // of. Absent entirely for some older/international events; that's fine,
+  // the UI just shows nothing.
+  const broadcast = [...new Set((competition?.broadcasts || []).flatMap((b) => b.names || []).filter(Boolean))].join(', ');
   return {
     id: event.id,
     shortName: event.shortName || event.name || '',
@@ -70,6 +80,7 @@ function normalizeEvent(event) {
     state: status.type?.state || 'pre', // 'pre' | 'in' | 'post'
     completed: !!status.type?.completed,
     detail: status.type?.shortDetail || '',
+    broadcast,
     home: team(home),
     away: team(away),
   };

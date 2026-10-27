@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { matchesTrackedTeam, getSportsSettings, saveSportsSettings } from './sports';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { matchesTrackedTeam, getSportsSettings, saveSportsSettings, fetchScoreboard } from './sports';
 
 function event(homeName, awayName) {
   return { home: { name: homeName, abbr: homeName.slice(0, 3).toUpperCase() }, away: { name: awayName, abbr: awayName.slice(0, 3).toUpperCase() } };
@@ -51,5 +51,55 @@ describe('getSportsSettings / saveSportsSettings', () => {
   it('saveSportsSettings fails soft rather than throwing when storage is blocked (private window, quota exceeded)', () => {
     global.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
     expect(() => saveSportsSettings({ leagueIds: ['nfl'], teamNames: [] })).not.toThrow();
+  });
+});
+
+function rawEvent(broadcasts) {
+  return {
+    id: 'g1',
+    shortName: 'DEN @ KC',
+    date: '2026-10-27T20:00Z',
+    status: { type: { state: 'pre', completed: false, shortDetail: '' } },
+    competitions: [{
+      broadcasts,
+      competitors: [
+        { homeAway: 'home', team: { displayName: 'Kansas City Chiefs', abbreviation: 'KC' }, score: '0', winner: false },
+        { homeAway: 'away', team: { displayName: 'Denver Broncos', abbreviation: 'DEN' }, score: '0', winner: false },
+      ],
+    }],
+  };
+}
+
+describe('fetchScoreboard broadcast parsing', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('joins every broadcast outlet\'s names into one display string', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [rawEvent([
+        { market: 'national', names: ['CBS'] },
+        { market: 'away', names: ['ALT'] },
+      ])] }),
+    });
+    const [ev] = await fetchScoreboard('nfl');
+    expect(ev.broadcast).toBe('CBS, ALT');
+  });
+
+  it('dedupes the same outlet name appearing in more than one market', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [rawEvent([
+        { market: 'national', names: ['ESPN+'] },
+        { market: 'away', names: ['ESPN+'] },
+      ])] }),
+    });
+    const [ev] = await fetchScoreboard('nfl');
+    expect(ev.broadcast).toBe('ESPN+');
+  });
+
+  it('is an empty string, not undefined, when ESPN gives no broadcast info', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [rawEvent(undefined)] }) });
+    const [ev] = await fetchScoreboard('nfl');
+    expect(ev.broadcast).toBe('');
   });
 });

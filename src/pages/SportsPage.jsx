@@ -14,7 +14,7 @@ function formatGameTime(iso) {
 }
 
 function GameRow({ event }) {
-  const { home, away, state, detail } = event;
+  const { home, away, state, detail, broadcast } = event;
   const live = state === 'in';
   return (
     <div className="task-item">
@@ -26,6 +26,7 @@ function GameRow({ event }) {
           <span className="task-due">
             {state === 'pre' ? formatGameTime(event.date) : detail}
           </span>
+          {!!broadcast && <span className="task-due">· 📺 {broadcast}</span>}
           {live && (
             <span className="task-tag" style={{ background: 'var(--ev-coral-bg)', color: 'var(--ev-coral-tx)' }}>
               ● Live
