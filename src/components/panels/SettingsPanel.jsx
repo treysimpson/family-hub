@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { hasBudgetPin, resetBudgetPin } from '../PinGate';
 import { LEAGUES, getSportsSettings, saveSportsSettings } from '../../lib/sports';
-import { getSolarSettings, saveSolarSettings } from '../../lib/solar';
 import { buildBugReportMailto } from '../../lib/bugReport';
 import HelpPanel from './HelpPanel';
 
@@ -14,7 +13,6 @@ export default function SettingsPanel() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [sportsSettings, setSportsSettings] = useState(() => getSportsSettings());
   const [teamInput, setTeamInput] = useState('');
-  const [solarSettings, setSolarSettings] = useState(() => getSolarSettings());
   const [bugText, setBugText] = useState('');
   const [bugSent, setBugSent] = useState(false);
 
@@ -49,12 +47,6 @@ export default function SettingsPanel() {
     const next = { ...sportsSettings, teamNames: sportsSettings.teamNames.filter((t) => t !== name) };
     setSportsSettings(next);
     saveSportsSettings(next);
-  };
-
-  const updateSolarField = (field, value) => {
-    const next = { ...solarSettings, [field]: value };
-    setSolarSettings(next);
-    saveSolarSettings(next);
   };
 
   return (
@@ -144,30 +136,6 @@ export default function SettingsPanel() {
             ))}
           </div>
         )}
-      </div>
-      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
-        <div className="settings-label">Solar (Enphase Enlighten)</div>
-        <div style={{ fontSize: '0.78em', color: 'var(--text-muted)' }}>
-          From developer-v4.enphase.com — see the Solar page's own explainer for the one-time setup steps. The Access Token expires after about a day; paste a fresh one here when the Solar page says it's expired.
-        </div>
-        <input
-          className="add-input"
-          placeholder="API Key"
-          value={solarSettings.apiKey}
-          onChange={(e) => updateSolarField('apiKey', e.target.value)}
-        />
-        <input
-          className="add-input"
-          placeholder="Access Token"
-          value={solarSettings.accessToken}
-          onChange={(e) => updateSolarField('accessToken', e.target.value)}
-        />
-        <input
-          className="add-input"
-          placeholder="System ID"
-          value={solarSettings.systemId}
-          onChange={(e) => updateSolarField('systemId', e.target.value)}
-        />
       </div>
       <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
         <div className="settings-label">Report a problem</div>
