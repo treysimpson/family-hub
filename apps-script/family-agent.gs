@@ -246,7 +246,20 @@ function processFamilyAgentEmails_() {
   const inboxLabel = getOrCreateLabel_(LABEL_INBOX);
   const threads = inboxLabel.getThreads();
 
-  threads.forEach((thread) => {
+  // Quota resilience (added 2026-10-26, T-38): this is the one pipeline
+  // that was still missing the T-30 fix applied to processBudgetEmails_ --
+  // a quota/429 error here used to be caught by the generic catch below
+  // and dumped into Needs Review exactly like any other failure, with no
+  // automatic retry, the same failure mode that caused T-30's Aug 29-Sep
+  // 24 gap for card alerts. Safe to do the same "stop and leave the thread
+  // alone" fix here with no idempotency risk: routeReceiptImage_ and
+  // parseWithGemini_ are each exactly one Gemini call per thread (unlike
+  // processTargetReceiptImports_/processCostcoReceiptImports_, which loop
+  // Gemini calls per-attachment within one thread -- leaving a thread
+  // retry there risks redoing an already-successful split and duplicating
+  // a transaction row, so those two are intentionally NOT touched by this
+  // fix; see T-38 in family-hub-project.md).
+  for (const thread of threads) {
     try {
       const messages = thread.getMessages();
       const message = messages[messages.length - 1];
@@ -263,7 +276,7 @@ function processFamilyAgentEmails_() {
       // first attachment's store is detected, so the rest would be parsed
       // with that same store's prompt.
       const receiptAttachments = findReceiptAttachments_(message);
-      if (receiptAttachments.length && routeReceiptImage_(thread, inboxLabel, receiptAttachments[0])) return;
+      if (receiptAttachments.length && routeReceiptImage_(thread, inboxLabel, receiptAttachments[0])) continue;
 
       const text = `${message.getSubject()}\n\n${message.getPlainBody()}`.trim();
       const results = parseWithGemini_(text); // array — one entry per requested item
@@ -271,7 +284,7 @@ function processFamilyAgentEmails_() {
       const actionable = results.filter(isActionable_);
       if (!actionable.length) {
         moveThread_(thread, inboxLabel, getOrCreateLabel_(LABEL_REVIEW));
-        return;
+        continue;
       }
 
       actionable.forEach(applyAction_);
@@ -280,10 +293,18 @@ function processFamilyAgentEmails_() {
       const toLabel = actionable.length < results.length ? LABEL_REVIEW : LABEL_DONE;
       moveThread_(thread, inboxLabel, getOrCreateLabel_(toLabel));
     } catch (err) {
+      if (/quota|RESOURCE_EXHAUSTED|429/i.test(String(err))) {
+        // Leave the thread under Family Agent; the next run retries it.
+        // Stop the whole run, not just this thread -- quota is a rolling
+        // window shared across every pipeline, so trying the next thread
+        // would almost certainly just fail the same way.
+        Logger.log('Gemini quota hit on family agent email -- stopping this run, will retry next run');
+        break;
+      }
       Logger.log('Failed to process thread "%s": %s', thread.getFirstMessageSubject(), err);
       moveThread_(thread, inboxLabel, getOrCreateLabel_(LABEL_REVIEW));
     }
-  });
+  }
 }
 
 // Finds every attachment worth trying as a receipt -- each a photo/
