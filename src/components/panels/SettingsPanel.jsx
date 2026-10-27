@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { hasBudgetPin, resetBudgetPin } from '../PinGate';
 import { LEAGUES, getSportsSettings, saveSportsSettings } from '../../lib/sports';
+import { getHomeAssistantSettings, saveHomeAssistantSettings } from '../../lib/homeAssistant';
 import { buildBugReportMailto } from '../../lib/bugReport';
 import HelpPanel from './HelpPanel';
 
@@ -13,6 +14,7 @@ export default function SettingsPanel() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [sportsSettings, setSportsSettings] = useState(() => getSportsSettings());
   const [teamInput, setTeamInput] = useState('');
+  const [haSettings, setHaSettings] = useState(() => getHomeAssistantSettings());
   const [bugText, setBugText] = useState('');
   const [bugSent, setBugSent] = useState(false);
 
@@ -47,6 +49,12 @@ export default function SettingsPanel() {
     const next = { ...sportsSettings, teamNames: sportsSettings.teamNames.filter((t) => t !== name) };
     setSportsSettings(next);
     saveSportsSettings(next);
+  };
+
+  const updateHaField = (field, value) => {
+    const next = { ...haSettings, [field]: value };
+    setHaSettings(next);
+    saveHomeAssistantSettings(next);
   };
 
   return (
@@ -136,6 +144,24 @@ export default function SettingsPanel() {
             ))}
           </div>
         )}
+      </div>
+      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
+        <div className="settings-label">Home Control (Home Assistant)</div>
+        <div style={{ fontSize: '0.78em', color: 'var(--text-muted)' }}>
+          For when the Phase 4 Pi exists — a local network address and a Long-Lived Access Token from your Home Assistant profile's Security tab. Home Control stays in preview mode until both are filled in and reachable.
+        </div>
+        <input
+          className="add-input"
+          placeholder="Home Assistant URL (e.g. http://homeassistant.local:8123)"
+          value={haSettings.baseUrl}
+          onChange={(e) => updateHaField('baseUrl', e.target.value)}
+        />
+        <input
+          className="add-input"
+          placeholder="Long-Lived Access Token"
+          value={haSettings.accessToken}
+          onChange={(e) => updateHaField('accessToken', e.target.value)}
+        />
       </div>
       <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.4em' }}>
         <div className="settings-label">Report a problem</div>
