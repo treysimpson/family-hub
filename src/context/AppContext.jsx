@@ -10,7 +10,7 @@ import {
 import {
   fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits, fetchFunMoney, fetchOrderItems,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
-  setFixedBillStatus, updateTransactionNotes,
+  setFixedBillStatus, updateTransactionNotes, EXCLUDED_BUDGET_CATEGORIES,
 } from '../lib/googleSheets';
 import { applyCardCredits, fixedBillKey } from '../lib/cardCredits';
 import { addTag, removeTag, hasTag, HOUSE_MAINTENANCE_TAG } from '../lib/notesTags';
@@ -29,15 +29,6 @@ const BUDGET_REFRESH_MS = 5 * 60 * 1000;
 // takes over. 5 minutes is a guess at a reasonable kiosk default, not a
 // measured preference -- tune freely.
 const SCREENSAVER_IDLE_MS = 5 * 60 * 1000;
-// Must match EXCLUDED_FROM_BUDGET in apps-script/family-agent.gs.
-// "loan-payments" (added 2026-10-26, T-31) joins this list for the same
-// reason one-time/trey-work do: a fixed, non-discretionary obligation
-// (mortgage/HELOC/car loan) isn't a spending choice to pace against a
-// monthly target the way groceries or dining are, and at ~$3.5k/mo it would
-// swamp the existing $9,500 target (built from card spend only) rather than
-// meaningfully inform it. Gets its own total tile instead, same as the
-// other two -- see budgetLoanPaymentsTotal below.
-const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work', 'loan-payments'];
 const ALL_LISTS = { ...PERSON_LISTS, ...STORE_LISTS };
 
 function currentMonthKey() {

@@ -15,6 +15,20 @@ export const TRANSACTION_CATEGORIES = [
   'beryl-personal', 'trey-personal', 'shopping', 'trey-work', 'one-time', 'loan-payments', 'other',
 ];
 
+// Categories excluded from the regular monthly budget total/category
+// breakdown/charts/trend line, each getting its own separate total tile
+// instead. Must match EXCLUDED_FROM_BUDGET in apps-script/family-agent.gs.
+// Single source of truth for AppContext.jsx/BudgetCharts.jsx/BudgetPage.jsx,
+// which all previously hand-maintained their own copy of this exact array --
+// "one-time" (a major, non-recurring expense like an HVAC replacement) and
+// "trey-work" (reimbursable, tracked outside the app) aren't a spending
+// choice to pace against a monthly target the way groceries or dining are;
+// "loan-payments" (mortgage/HELOC/car loan, added 2026-10-26, T-31) joins
+// them for the same reason -- at ~$3.5k/mo it would swamp the existing
+// $9,500 target (built from card spend only) rather than meaningfully
+// inform it.
+export const EXCLUDED_BUDGET_CATEGORIES = ['one-time', 'trey-work', 'loan-payments'];
+
 // Column order must match appendTransactionRow_ in apps-script/family-agent.gs.
 // Column H (Hidden) is written directly by the Apps Script's hide_transaction
 // action (not by appendTransactionRow_, which never creates a row pre-hidden).

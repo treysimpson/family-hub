@@ -3,11 +3,7 @@ import { ResponsivePie } from '@nivo/pie';
 import { ResponsiveLine } from '@nivo/line';
 import { getNivoTheme, colorForCategory, cssVar } from '../lib/chartTheme';
 import { fixedBillKey } from '../lib/cardCredits';
-
-// Must match EXCLUDED_BUDGET_CATEGORIES in AppContext.jsx / EXCLUDED_FROM_BUDGET
-// in apps-script/family-agent.gs — these charts should reflect the same
-// "regular monthly spending" definition the rest of the Budget page uses.
-const EXCLUDED_FROM_CHARTS = ['one-time', 'trey-work', 'loan-payments'];
+import { EXCLUDED_BUDGET_CATEGORIES as EXCLUDED_FROM_CHARTS } from '../lib/googleSheets';
 
 function formatCategoryLabel(category) {
   return category.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

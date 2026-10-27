@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { TRANSACTION_CATEGORIES } from '../lib/googleSheets';
+import { TRANSACTION_CATEGORIES, EXCLUDED_BUDGET_CATEGORIES } from '../lib/googleSheets';
 import PinGate from '../components/PinGate';
 import CategoryTrendChart from '../components/CategoryTrendChart';
 import BudgetCharts from '../components/BudgetCharts';
@@ -231,13 +231,11 @@ export default function BudgetPage() {
     }));
   });
 
-  // Total-spend line for the overview charts — must match
-  // EXCLUDED_BUDGET_CATEGORIES in AppContext.jsx / EXCLUDED_FROM_CHARTS in
-  // BudgetCharts.jsx, same "regular monthly spending" definition used
-  // everywhere else on this page.
+  // Total-spend line for the overview charts, same "regular monthly
+  // spending" definition used everywhere else on this page.
   const trendMonthLabels = trendMonths.map((m) => formatMonthLabel(m).slice(0, 3));
   const trendTotals = trendMonths.map((m) => budgetTransactions
-    .filter((t) => !['one-time', 'trey-work', 'loan-payments'].includes(t.category) && t.date.startsWith(m))
+    .filter((t) => !EXCLUDED_BUDGET_CATEGORIES.includes(t.category) && t.date.startsWith(m))
     .reduce((sum, t) => sum + t.amount, 0));
 
   // All-time, not scoped to the selected month — reimbursements often lag
