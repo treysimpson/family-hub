@@ -2,18 +2,15 @@
 // no backend, no client secret, same backend-less shape as googleAuth.js's
 // token model (https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow).
 //
-// CLIENT_ID is deliberately empty: this needs a one-time Spotify Developer
-// app registration under Trey's own account (developer.spotify.com/dashboard
-// -> Create app), which is an account action, not something to do from here
-// -- same category as T-14's Enlighten key and T-19's Photos OAuth scope.
-// Once Trey has a Client ID, paste it in below and add both
-// `http://localhost:5183/family-hub/` and the real GitHub Pages URL
-// (`https://treysimpson.github.io/family-hub/`) as Redirect URIs in the
-// Spotify app's dashboard settings -- they must match REDIRECT_URI below
-// exactly, including the trailing slash. Nothing else needs to change;
-// isConfigured() flips true the moment CLIENT_ID is non-empty, which is all
-// MusicPage.jsx checks to leave its "not connected yet" state.
-const CLIENT_ID = '';
+// CLIENT_ID below is Trey's own Spotify Developer app, registered 2026-10-27
+// (developer.spotify.com/dashboard, Web API only -- no SDK/Ads/mobile
+// scopes needed), with both `http://localhost:5183/family-hub/` and the
+// real GitHub Pages URL (`https://treysimpson.github.io/family-hub/`)
+// already added as Redirect URIs, matching REDIRECT_URI below exactly.
+// Public-safe to commit, same as googleAuth.js's CLIENT_ID -- a PKCE public
+// client's Client ID is an identifier, not a secret; nothing else needs to
+// change for this to go live.
+const CLIENT_ID = 'fdeb9d624dbf46a8950d908a2f86feba';
 const SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state';
 
 // Computed lazily (not a module-scope const) since `window` doesn't exist

@@ -11,10 +11,10 @@ import {
 } from './spotify';
 
 describe('isConfigured', () => {
-  it('is false until Trey registers a Spotify app and fills in CLIENT_ID', () => {
-    // Documents the current, deliberate "not wired in yet" state (see the
-    // CLIENT_ID comment in spotify.js) rather than asserting a secret value.
-    expect(isConfigured()).toBe(false);
+  it('is true now that Trey has registered a Spotify app and CLIENT_ID is filled in', () => {
+    // Flips with CLIENT_ID (see spotify.js) -- was false before 2026-10-27,
+    // documented that way until Trey completed the one-time app registration.
+    expect(isConfigured()).toBe(true);
   });
 });
 
