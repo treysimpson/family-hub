@@ -130,6 +130,19 @@ describe('chore definitions (add/remove)', () => {
     expect(added.id).toBeTruthy();
   });
 
+  it('keeps an explicit 0 points value, rather than silently defaulting it to 5 (the add-chore form\'s input allows min="0")', () => {
+    addChore('bryce', { text: 'Say good morning', freq: 'Daily', routine: '', points: 0 });
+    const added = getChoreDefinitions().bryce.find((c) => c.text === 'Say good morning');
+    expect(added.points).toBe(0);
+  });
+
+  it('still defaults to 5 points for a genuinely blank or invalid points field', () => {
+    addChore('bryce', { text: 'Blank points', freq: 'Daily', routine: '', points: '' });
+    expect(getChoreDefinitions().bryce.find((c) => c.text === 'Blank points').points).toBe(5);
+    addChore('bryce', { text: 'Invalid points', freq: 'Daily', routine: '', points: 'abc' });
+    expect(getChoreDefinitions().bryce.find((c) => c.text === 'Invalid points').points).toBe(5);
+  });
+
   it('an empty/blank routine is stored as null, not an empty string', () => {
     addChore('emery', { text: 'Pack lunch', freq: 'Daily', routine: '  ', points: 5 });
     const added = getChoreDefinitions().emery.find((c) => c.text === 'Pack lunch');

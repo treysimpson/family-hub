@@ -173,12 +173,17 @@ function saveChoreDefinitions(data) {
 
 export function addChore(personId, { text, freq, routine, points }) {
   const data = getChoreDefinitions();
+  // Not `Number(points) || 5` -- the add-chore form's points input allows 0
+  // (min="0"), and `0 || 5` can't tell a deliberate 0 apart from a blank or
+  // invalid field, silently overriding it to 5 either way. Only fall back
+  // to 5 when there's genuinely no usable number.
+  const parsedPoints = Number(points);
   const chore = {
     id: `custom-${Date.now()}-${Math.round(Math.random() * 1000)}`,
     text: text.trim(),
     freq,
     routine: routine?.trim() || null,
-    points: Number(points) || 5,
+    points: points === '' || points == null || Number.isNaN(parsedPoints) ? 5 : parsedPoints,
   };
   const next = { ...data, [personId]: [...(data[personId] || []), chore] };
   saveChoreDefinitions(next);
