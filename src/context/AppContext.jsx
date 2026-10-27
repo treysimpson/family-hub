@@ -8,7 +8,7 @@ import {
   insertTask, setTaskStatus, deleteTask, clearCompletedTasks, pruneStaleCompleted,
 } from '../lib/googleTasks';
 import {
-  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits, fetchFunMoney, fetchOrderItems,
+  fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits, fetchFunMoney, fetchOrderItems, fetchRecipes,
   updateTransactionCategory, upsertMerchantMemory, updateTransactionMerchant, upsertMerchantName,
   setFixedBillStatus, updateTransactionNotes, EXCLUDED_BUDGET_CATEGORIES,
 } from '../lib/googleSheets';
@@ -85,6 +85,10 @@ export function AppProvider({ children }) {
   const [selectedBudgetYear, setSelectedBudgetYear] = useState(() => new Date().getFullYear());
   const [funMoneyEntries, setFunMoneyEntries] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
+  // T-17/T-18. Empty until Trey emails in a Paprika export (see
+  // processPaprikaImport_ in the Apps Script) -- DinnerPage.jsx falls back
+  // to mock recipes until then, same live/mock branching as every other page.
+  const [recipes, setRecipes] = useState([]);
 
   // T-19 screensaver: any touch/click/key resets the idle clock; once it
   // runs out, the screensaver takes over (see #screensaver in index.css /
@@ -186,6 +190,7 @@ export function AppProvider({ children }) {
       fetchCardCredits(accessToken).then((data) => { if (!cancelled) setCardCreditRules(data); });
       fetchFunMoney(accessToken).then((data) => { if (!cancelled) setFunMoneyEntries(data); });
       fetchOrderItems(accessToken).then((data) => { if (!cancelled) setOrderItems(data); });
+      fetchRecipes(accessToken).then((data) => { if (!cancelled) setRecipes(data); });
     };
     load();
     const id = setInterval(load, BUDGET_REFRESH_MS);
@@ -565,6 +570,7 @@ export function AppProvider({ children }) {
     budgetOneTimeTotal, budgetReimbursableTotal, budgetLoanPaymentsTotal, budgetCategoryTotals, budgetTargets,
     budgetFixedTotal, budgetDiscretionaryTotal, fixedBillMerchants, recategorizeTransaction, renameMerchant, budgetActionError,
     toggleFixedBill, toggleHouseMaintenanceTag, funMoneyEntries, funMoneyBalances, orderItemsByEmailId,
+    recipes, recipesLive: isSignedIn && recipes.length > 0,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

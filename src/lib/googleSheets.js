@@ -49,6 +49,10 @@ const FUN_MONEY_RANGE = 'Fun Money!A2:E';
 const MERCHANT_MEMORY_RANGE = 'Merchant Memory!A2:B';
 const MERCHANT_NAMES_RANGE = 'Merchant Names!A2:B';
 const ORDER_ITEMS_RANGE = 'Order Items!A2:C';
+// Name, Ingredients (one per line within the cell), Directions, PrepTime,
+// CookTime, Servings, Source, Categories (comma-joined), Notes -- written
+// by processPaprikaImport_ in the Apps Script (T-17), column order must match.
+const RECIPES_RANGE = 'Recipes!A2:I';
 
 // Sheets auto-detects date-shaped strings and stores them as its own date
 // type even when written via appendRow, not just manual entry — so with
@@ -258,6 +262,31 @@ export async function fetchFunMoney(accessToken, spreadsheetId = BUDGET_SPREADSH
         description: row[4] || '',
       }))
       .filter((f) => f.date && f.person);
+  } catch {
+    return [];
+  }
+}
+
+// T-17/T-18. Resolves to empty if the tab doesn't exist yet (same reasoning
+// as the other reference tabs above) -- real until Trey completes the
+// one-time Paprika export + email-in step, same pattern as every other
+// not-yet-populated reference tab in this app.
+export async function fetchRecipes(accessToken, spreadsheetId = BUDGET_SPREADSHEET_ID) {
+  try {
+    const rows = await fetchRange_(accessToken, spreadsheetId, RECIPES_RANGE);
+    return rows
+      .map((row) => ({
+        name: String(row[0] || '').trim(),
+        ingredients: String(row[1] || '').split('\n').map((s) => s.trim()).filter(Boolean),
+        directions: String(row[2] || '').trim(),
+        prepTime: String(row[3] || '').trim(),
+        cookTime: String(row[4] || '').trim(),
+        servings: String(row[5] || '').trim(),
+        source: String(row[6] || '').trim(),
+        categories: String(row[7] || '').split(',').map((s) => s.trim()).filter(Boolean),
+        notes: String(row[8] || '').trim(),
+      }))
+      .filter((r) => r.name);
   } catch {
     return [];
   }

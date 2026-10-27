@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { id: 'sports', label: 'Sports' },
   { id: 'music', label: 'Music' },
   { id: 'solar', label: 'Solar' },
+  { id: 'dinner', label: 'Dinner' },
 ];
 
 function useClock() {

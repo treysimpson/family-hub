@@ -571,6 +571,39 @@ writes everything in one batch, then runs the Payhawk work-expense match.
     needed — this is a one-off. Check Executions for "added N of M rows".
     Safe to re-run: rows already present are skipped.
 
+## Paprika recipe import (T-17, added 2026-10-27)
+
+Paprika's own Export feature (not a live Dropbox integration — see the
+comment above `PAPRIKA_IMPORT_LABEL_INBOX` in `family-agent.gs` for why) saves
+a `.paprikarecipes` file: a plain ZIP containing one gzip-compressed
+`.paprikarecipe` file (flat JSON) per recipe. This is a format the Paprika
+app itself doesn't publish a spec for — confirmed against multiple
+independent community write-ups before building this, not guessed, but
+treat the first real import as the real test of that assumption.
+`processPaprikaImport_` unzips/gunzips with Apps Script's own built-in
+`Utilities.unzip`/`Utilities.ungzip` (no third-party library), maps each
+recipe's fields into the new **Recipes** tab (Name, Ingredients, Directions,
+PrepTime, CookTime, Servings, Source, Categories, Notes), and is safe to
+re-run on a refreshed export — a recipe already present (matched by name,
+case-insensitive) gets its row updated in place instead of duplicated.
+
+33. **Export your Paprika library**: in the Paprika app, use its Export
+    feature to produce a `.paprikarecipes` file (Paprika's desktop/mobile
+    apps all have this under some form of Settings → Export or File →
+    Export — exact menu wording varies by platform). Email that file to
+    yourself (wdsimpson3@gmail.com) as an attachment and apply the label
+    `Paprika Import`.
+34. **Add a sixth trigger** (same reasoning as Statement/Work Expense
+    Import): Triggers page → Add Trigger → function `processPaprikaImport`
+    → Time-driven → Hour timer → Every hour → Save. Or just run
+    `processPaprikaImport` manually from the function dropdown for a one-off
+    import — check Executions for "N new, M updated recipes".
+
+Known gap: Paprika's recipe photos aren't imported — the Hub app's Dinner
+page shows a plain icon per recipe, not the real photo. Pulling those in
+would mean storing image data somewhere a Sheet cell can't hold it
+(Drive, most likely) — a bigger change than this first pass, not done here.
+
 ## Testing
 
 Send (or voice-dictate via Siri/Gemini) an email to simpsonfamilyhubapp@gmail.com, e.g.

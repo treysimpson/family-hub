@@ -160,6 +160,23 @@ const CLEAN_IMPORT_LABEL_DONE = 'Clean Import/Done';
 const CLEAN_IMPORT_LABEL_REVIEW = 'Clean Import/Needs Review';
 const CLEAN_IMPORT_HEADER = ['Date', 'Card', 'Merchant', 'Amount', 'Category'];
 
+// ---- Paprika recipe import (T-17, 2026-10-27) ----
+// Paprika's own "Export" feature produces a .paprikarecipes file -- a plain
+// ZIP archive containing one gzip-compressed .paprikarecipe file (itself
+// flat JSON) per recipe. This is a community-documented, not officially
+// published, format -- there's no vendor API, so the whole pipeline relies
+// on that reverse-engineered shape holding (confirmed against multiple
+// independent sources before building this, not guessed). No Dropbox API
+// integration here despite the original T-17 idea mentioning Dropbox --
+// Paprika's actual "export to Dropbox" is just saving this same file into a
+// synced folder, so emailing the exported file in (same manual-label
+// pattern as Statement/Work Expense/Clean Import) avoids a second OAuth
+// integration for no real benefit. Same no-Gemini, deterministic parse as
+// Clean Import, since the export is already fully structured.
+const PAPRIKA_IMPORT_LABEL_INBOX = 'Paprika Import';
+const PAPRIKA_IMPORT_LABEL_DONE = 'Paprika Import/Done';
+const PAPRIKA_IMPORT_LABEL_REVIEW = 'Paprika Import/Needs Review';
+
 // ---- Merchant memory (T-11 Phase D) ----
 // Written from the Hub app when Trey/Beryl manually recategorize a
 // transaction (see src/context/AppContext.jsx recategorizeTransaction).
@@ -196,6 +213,15 @@ const MERCHANT_NAMES_TAB = 'Merchant Names';
 // (src/lib/googleSheets.js fetchOrderItems) -- never read back by this
 // script.
 const ORDER_ITEMS_TAB = 'Order Items';
+
+// ---- Recipes (T-17/T-18) ----
+// Written by processPaprikaImport_ below, read by the Hub app's Dinner page
+// (src/lib/googleSheets.js fetchRecipes) -- never read back by this script.
+// Lives on the same Budget spreadsheet as every other non-core-transaction
+// reference tab (Order Items, Merchant Memory/Names, Card Credits) rather
+// than a brand-new spreadsheet, so the Hub app needs no new, not-yet-created
+// spreadsheet ID to configure.
+const RECIPES_TAB = 'Recipes';
 
 // Guards a trigger-invoked function against overlapping runs -- without
 // this, two runs (a 5-minute trigger firing again while the previous run is
@@ -1119,6 +1145,67 @@ function loadLookupTab_(spreadsheet, tabName) {
   return map;
 }
 
+// Manual/infrequent, same shape as Statement/Work Expense/Clean Import:
+// Trey exports his Paprika library, emails the .paprikarecipes file to
+// himself labeled "Paprika Import", and this picks it up (on whichever
+// polling cadence it ends up on -- see apps-script/README.md). Safe to run
+// repeatedly on the same export or a refreshed one: matched by recipe name
+// (case-insensitive), an existing row is updated in place rather than
+// duplicated, same "re-run is safe" property Clean Import's dedupe gives
+// transactions.
+function processPaprikaImport() { withLock_(processPaprikaImport_); }
+function processPaprikaImport_() {
+  const inboxLabel = getOrCreateLabel_(PAPRIKA_IMPORT_LABEL_INBOX);
+  const threads = inboxLabel.getThreads();
+  if (!threads.length) return;
+
+  const spreadsheet = getOrCreateBudgetSpreadsheet_();
+  const sheet = getOrCreateRecipesSheet_(spreadsheet);
+  const existingRows = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues() : [];
+  const existingRowByName = new Map();
+  existingRows.forEach(function (row, i) {
+    const key = String(row[0] || '').toLowerCase().trim();
+    if (key) existingRowByName.set(key, i + 2);
+  });
+
+  threads.forEach(function (thread) {
+    try {
+      const messages = thread.getMessages();
+      const message = messages[messages.length - 1];
+      const attachments = message.getAttachments().filter(isPaprikaAttachment_);
+      if (!attachments.length) {
+        moveThread_(thread, inboxLabel, getOrCreateLabel_(PAPRIKA_IMPORT_LABEL_REVIEW));
+        return;
+      }
+
+      let added = 0;
+      let updated = 0;
+      attachments.forEach(function (attachment) {
+        const recipes = parsePaprikaExport_(attachment);
+        recipes.forEach(function (r) {
+          const row = [r.name, r.ingredients.join('\n'), r.directions, r.prepTime, r.cookTime, r.servings, r.source, r.categories.join(', '), r.notes];
+          const key = r.name.toLowerCase();
+          const existingRow = existingRowByName.get(key);
+          if (existingRow) {
+            sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+            updated += 1;
+          } else {
+            sheet.appendRow(row);
+            existingRowByName.set(key, sheet.getLastRow());
+            added += 1;
+          }
+        });
+      });
+
+      Logger.log('Paprika import "%s": %s new, %s updated recipes', thread.getFirstMessageSubject(), added, updated);
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(PAPRIKA_IMPORT_LABEL_DONE));
+    } catch (err) {
+      Logger.log('Failed to process Paprika import thread "%s": %s', thread.getFirstMessageSubject(), err);
+      moveThread_(thread, inboxLabel, getOrCreateLabel_(PAPRIKA_IMPORT_LABEL_REVIEW));
+    }
+  });
+}
+
 function processWorkExpenseImport() { withLock_(processWorkExpenseImport_); }
 function processWorkExpenseImport_() {
   const inboxLabel = getOrCreateLabel_(WORK_EXPENSE_LABEL_INBOX);
@@ -1413,6 +1500,73 @@ function isCsvAttachment_(attachment) {
 
 function isStatementAttachment_(attachment) {
   return attachment.getContentType() === 'application/pdf' || isCsvAttachment_(attachment);
+}
+
+// Paprika's export has no registered MIME type (it's a proprietary
+// extension on a plain ZIP), so Gmail will report something generic like
+// application/zip or application/octet-stream depending on the sender --
+// matched on filename instead, same reasoning isCsvAttachment_ falls back
+// to a filename check for.
+function isPaprikaAttachment_(attachment) {
+  return /\.paprikarecipes$/i.test(attachment.getName() || '');
+}
+
+// Pure mapping from one decompressed Paprika recipe's raw JSON to this
+// app's row shape -- kept separate from parsePaprikaExport_ below so it can
+// be exercised directly (Node-simulated against hand-built fixtures
+// matching the documented Paprika export field names, the same way every
+// other pure algorithmic piece of this file has been verified this
+// session, e.g. computeCategorySplit_). "categories" has been seen as
+// either a plain string array or a comma-separated string depending on
+// Paprika version/platform, so both are handled.
+function normalizePaprikaRecipe_(raw) {
+  const ingredients = String(raw.ingredients || '')
+    .split('\n')
+    .map(function (s) { return s.trim(); })
+    .filter(Boolean);
+
+  const rawCategories = raw.categories;
+  let categories = [];
+  if (Array.isArray(rawCategories)) {
+    categories = rawCategories.filter(function (c) { return typeof c === 'string' && c.trim(); });
+  } else if (typeof rawCategories === 'string' && rawCategories.trim()) {
+    categories = rawCategories.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  return {
+    name: String(raw.name || '').trim(),
+    ingredients: ingredients,
+    directions: String(raw.directions || '').trim(),
+    prepTime: String(raw.prep_time || '').trim(),
+    cookTime: String(raw.cook_time || '').trim(),
+    servings: String(raw.servings || '').trim(),
+    source: String(raw.source || raw.source_url || '').trim(),
+    categories: categories,
+    notes: String(raw.notes || '').trim(),
+  };
+}
+
+// Unzips the outer .paprikarecipes archive, then gunzips each inner
+// .paprikarecipe entry -- both steps use Apps Script's own built-in
+// Utilities.unzip/ungzip, no third-party library needed. One bad entry
+// (corrupt/unexpected shape) is skipped and logged rather than failing the
+// whole import, since a multi-hundred-recipe export is exactly the kind of
+// file where one odd recipe shouldn't block the other 899.
+function parsePaprikaExport_(blob) {
+  const entries = Utilities.unzip(blob);
+  const recipes = [];
+  entries.forEach(function (entry) {
+    if (!/\.paprikarecipe$/i.test(entry.getName() || '')) return;
+    try {
+      const decompressed = Utilities.ungzip(entry.setContentType('application/x-gzip'));
+      const raw = JSON.parse(decompressed.getDataAsString());
+      const normalized = normalizePaprikaRecipe_(raw);
+      if (normalized.name) recipes.push(normalized);
+    } catch (err) {
+      Logger.log('Skipping unparseable Paprika recipe entry "%s": %s', entry.getName(), err);
+    }
+  });
+  return recipes;
 }
 
 // A bank CSV export is already structured, so it's sent to Gemini as plain
@@ -1999,6 +2153,17 @@ function getOrCreateOrderItemsSheet_(spreadsheet) {
   return sheet;
 }
 
+function getOrCreateRecipesSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(RECIPES_TAB);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet();
+    sheet.setName(RECIPES_TAB);
+    sheet.appendRow(['Name', 'Ingredients', 'Directions', 'PrepTime', 'CookTime', 'Servings', 'Source', 'Categories', 'Notes']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 // One row per item across every category in the order/receipt, so a
 // transaction's Details view (looked up by EmailId in the Hub app) shows
 // the full item list regardless of which of the split Transactions rows it
@@ -2190,6 +2355,7 @@ function setupBudgetSheets() {
   getOrCreateMerchantNamesSheet_(spreadsheet);
   getOrCreateOrderItemsSheet_(spreadsheet);
   getOrCreateWorkExpensesSheet_(spreadsheet);
+  getOrCreateRecipesSheet_(spreadsheet);
   Logger.log('Budget sheets ready: ' + spreadsheet.getUrl());
 }
 

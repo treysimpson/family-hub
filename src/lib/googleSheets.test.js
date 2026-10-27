@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   fetchTransactions, fetchBudgetTargets, fetchFixedBills, fetchCardCredits,
-  fetchOrderItems, fetchFunMoney, updateTransactionCategory, upsertMerchantMemory,
+  fetchOrderItems, fetchFunMoney, fetchRecipes, updateTransactionCategory, upsertMerchantMemory,
 } from './googleSheets';
 
 // Mocks the global fetch this module calls directly (no fetch-mocking infra
@@ -95,6 +95,37 @@ describe('reference-tab fetchers fail soft to empty (unlike fetchTransactions)',
   it('fetchFunMoney resolves to [] on an API failure', async () => {
     mockFetchOnce(null, false, 500);
     expect(await fetchFunMoney('token')).toEqual([]);
+  });
+
+  it('fetchRecipes resolves to [] on an API failure (e.g. the tab not existing yet)', async () => {
+    mockFetchOnce(null, false, 500);
+    expect(await fetchRecipes('token')).toEqual([]);
+  });
+});
+
+describe('fetchRecipes', () => {
+  it('splits Ingredients on newline and Categories on comma into arrays', async () => {
+    mockFetchOnce([[
+      'Chicken Tacos', '1 lb chicken\n8 tortillas', 'Grill and assemble.',
+      '10 min', '15 min', '4', 'Family recipe', 'Dinner, Mexican', 'Kids like it mild',
+    ]]);
+    const recipes = await fetchRecipes('token');
+    expect(recipes).toEqual([{
+      name: 'Chicken Tacos',
+      ingredients: ['1 lb chicken', '8 tortillas'],
+      directions: 'Grill and assemble.',
+      prepTime: '10 min',
+      cookTime: '15 min',
+      servings: '4',
+      source: 'Family recipe',
+      categories: ['Dinner', 'Mexican'],
+      notes: 'Kids like it mild',
+    }]);
+  });
+
+  it('filters out a row with no name', async () => {
+    mockFetchOnce([['', 'stray ingredient row']]);
+    expect(await fetchRecipes('token')).toEqual([]);
   });
 });
 

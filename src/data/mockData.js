@@ -303,6 +303,53 @@ export const scenes = [
 // to anywhere the app can read a log from). AgentPanel.jsx labels these
 // clearly as examples rather than real unread notifications, since showing
 // them as if they were real pending items would be misleading.
+// ── Recipes (T-17/T-18) ──
+// Real example recipes, not placeholder lorem — shown whenever Dinner isn't
+// live yet (Trey hasn't emailed in a Paprika export) so the page is a real,
+// useful demo of the feature rather than an empty shell. Same field shape
+// fetchRecipes (src/lib/googleSheets.js) returns from the real sheet.
+export const mockRecipes = [
+  {
+    name: 'Sheet Pan Chicken Fajitas',
+    ingredients: ['1.5 lb chicken breast, sliced', '2 bell peppers, sliced', '1 onion, sliced', '2 tbsp olive oil', '1 packet fajita seasoning', '8 small tortillas'],
+    directions: 'Toss chicken and vegetables with oil and seasoning. Spread on a sheet pan. Roast at 425°F for 20-25 min, stirring once. Serve with warm tortillas.',
+    prepTime: '10 min',
+    cookTime: '25 min',
+    servings: '4',
+    source: 'Family recipe',
+    categories: ['Dinner', 'Mexican'],
+    notes: 'Kids like it mild — skip the jalapeño.',
+  },
+  {
+    name: 'One-Pot Creamy Tomato Pasta',
+    ingredients: ['1 lb pasta', '1 can crushed tomatoes', '2 cups vegetable broth', '1/2 cup heavy cream', '2 cloves garlic, minced', 'Parmesan to serve'],
+    directions: 'Combine pasta, tomatoes, broth, and garlic in a large pot. Simmer 12-15 min, stirring occasionally, until pasta is tender. Stir in cream. Top with Parmesan.',
+    prepTime: '5 min',
+    cookTime: '15 min',
+    servings: '6',
+    source: 'Family recipe',
+    categories: ['Dinner', 'Vegetarian'],
+    notes: '',
+  },
+  {
+    name: 'Weeknight Beef Tacos',
+    ingredients: ['1 lb ground beef', '1 packet taco seasoning', '8 hard taco shells', 'Shredded cheese', 'Lettuce, shredded', 'Salsa'],
+    directions: 'Brown beef in a skillet, drain fat, stir in taco seasoning and a splash of water. Simmer 5 min. Fill shells and top as desired.',
+    prepTime: '5 min',
+    cookTime: '15 min',
+    servings: '4',
+    source: 'Family recipe',
+    categories: ['Dinner', 'Mexican'],
+    notes: '',
+  },
+];
+
+// ── Agent inbox ──
+// Illustrative only — there's no live feed of what the email agent has
+// actually done recently (it writes straight to Tasks/Calendar/Sheets, not
+// to anywhere the app can read a log from). AgentPanel.jsx labels these
+// clearly as examples rather than real unread notifications, since showing
+// them as if they were real pending items would be misleading.
 export const agentInbox = [
   { from: 'Example', msg: '"Add dentist appt for Emery Mar 21 at 2pm" — added to calendar ✓' },
   { from: 'Example', msg: '"Add milk to groceries" — added to list ✓' },
