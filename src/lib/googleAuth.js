@@ -4,7 +4,10 @@
 const CLIENT_ID = '214844293769-vrmfijk6r20969u86vkb4706e4p7gkrd.apps.googleusercontent.com';
 // spreadsheets (not .readonly): the Budget page writes back manual category
 // corrections and merchant-memory entries (T-11 Phase D).
-const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/spreadsheets';
+// drive.readonly (added 2026-10-27, T-19): lets the screensaver read photos
+// from a Drive folder Trey/Beryl drop family photos into -- see
+// googlePhotos.js. Read-only, same reasoning as every other scope here.
+const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly';
 const STORAGE_KEY = 'fh-google-token';
 
 let gisLoadPromise = null;
