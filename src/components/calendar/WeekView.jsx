@@ -9,10 +9,15 @@ export default function WeekView({ days, onEventClick, todayLabel }) {
               <span className="week-date">{day.date}</span>
             </div>
             <div className="week-wx">
+              {/* hi/lo are null, not undefined, for a day outside Open-Meteo's
+                  forecast range -- the Week view always shows the full Sun-Sat
+                  week, so every day before today has no forecast at all. The
+                  ?? fallback matches wxIcon's own "—" below rather than
+                  rendering a bare "°" with no number for those days. */}
               <span className="wx-ic">{day.wxIcon}</span>
-              <span className="wx-hi">{day.hi}°</span>
+              <span className="wx-hi">{day.hi ?? '—'}°</span>
               <span className="wx-sep">/</span>
-              <span className="wx-lo">{day.lo}°</span>
+              <span className="wx-lo">{day.lo ?? '—'}°</span>
             </div>
           </div>
           <div className="week-events">
