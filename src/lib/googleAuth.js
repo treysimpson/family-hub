@@ -59,9 +59,23 @@ async function getTokenClient() {
   return tokenClient;
 }
 
+// The single shared tokenClient's .callback is reassigned by every call
+// below, so if a second requestToken() starts before an earlier one's
+// response arrives (e.g. the mount-time silent-renewal attempt still in
+// flight when the user clicks "Sign in" on a slow connection), the earlier
+// call's callback reference gets silently overwritten -- Google still
+// calls back, but into the newer call's resolve/reject, so the earlier
+// promise never settles at all. For an explicit signIn() that means
+// AuthContext.jsx's "Signing in..." button stays stuck forever with no
+// error, recoverable only by reloading the page. Tracked here so a new
+// call can reject whichever call it's about to supersede instead of
+// leaving it to hang.
+let supersedePrevious = null;
+
 // prompt: '' for silent renewal (no UI if the browser still has an active Google
 // session), 'consent'/undefined for an explicit sign-in the user initiated.
 function requestToken({ prompt } = {}) {
+  supersedePrevious?.(new Error('Superseded by a newer sign-in request'));
   // Not an async executor: if getTokenClient() ever rejects (e.g. the GIS
   // script fails to load -- blocked by an ad blocker, no network), an async
   // executor's rejection has nowhere to go -- it doesn't call the outer
@@ -69,13 +83,20 @@ function requestToken({ prompt } = {}) {
   // would sit on "Signing in..." with no error ever shown. .catch(reject)
   // below routes that failure to the caller properly.
   return new Promise((resolve, reject) => {
+    supersedePrevious = reject;
+    const settle = (fn) => (arg) => {
+      if (supersedePrevious === reject) supersedePrevious = null;
+      fn(arg);
+    };
+    const resolveOnce = settle(resolve);
+    const rejectOnce = settle(reject);
     getTokenClient().then((client) => {
       client.callback = (response) => {
-        if (response.error) { reject(new Error(response.error)); return; }
-        resolve(storeToken(response.access_token, response.expires_in));
+        if (response.error) { rejectOnce(new Error(response.error)); return; }
+        resolveOnce(storeToken(response.access_token, response.expires_in));
       };
       client.requestAccessToken({ prompt });
-    }).catch(reject);
+    }).catch(rejectOnce);
   });
 }
 
