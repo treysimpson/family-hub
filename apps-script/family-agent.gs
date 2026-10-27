@@ -890,9 +890,15 @@ function computeCategorySplit_(categories, total) {
   const allocatedSum = allocated.reduce((sum, a) => sum + a.amount, 0);
   const remainder = Math.round((total - allocatedSum) * 100) / 100;
   if (remainder !== 0) {
+    // Math.abs, not a plain >: on a return (negative total) a bare ">"
+    // picks whichever share is closest to zero rather than the largest
+    // one -- e.g. -9.99 > -89.86 is true even though the 90% share is the
+    // real "largest," contradicting the comment above. Doesn't matter for
+    // a purchase (every amount is already positive), but does for a
+    // multi-category return/refund split.
     let largest = 0;
     for (let i = 1; i < allocated.length; i++) {
-      if (allocated[i].amount > allocated[largest].amount) largest = i;
+      if (Math.abs(allocated[i].amount) > Math.abs(allocated[largest].amount)) largest = i;
     }
     allocated[largest].amount = Math.round((allocated[largest].amount + remainder) * 100) / 100;
   }
