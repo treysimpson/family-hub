@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { handleRedirectCallback as handleSpotifyRedirect } from './lib/spotify';
 import TopBar from './components/TopBar';
 import SettingsPanel from './components/panels/SettingsPanel';
 import AgentPanel from './components/panels/AgentPanel';
@@ -16,6 +17,7 @@ import HomeControlPage from './pages/HomeControlPage';
 import WeatherPage from './pages/WeatherPage';
 import BudgetPage from './pages/BudgetPage';
 import SportsPage from './pages/SportsPage';
+import MusicPage from './pages/MusicPage';
 
 const PAGES = {
   home: Home,
@@ -27,6 +29,7 @@ const PAGES = {
   weather: WeatherPage,
   budget: BudgetPage,
   sports: SportsPage,
+  music: MusicPage,
 };
 
 function Screen() {
@@ -54,6 +57,15 @@ function Screen() {
 }
 
 export default function App() {
+  // Runs once per load. A no-op the overwhelming majority of the time (no
+  // `?code=` in the URL) -- only does real work on the one page load right
+  // after a user approves Spotify access and gets redirected back here (see
+  // spotify.js's REDIRECT_URI, which points at this same app root, not a
+  // dedicated callback route).
+  useEffect(() => {
+    handleSpotifyRedirect().catch(() => {});
+  }, []);
+
   return (
     <AuthProvider>
       <AppProvider>

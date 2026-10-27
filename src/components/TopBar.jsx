@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: 'weather', label: 'Weather' },
   { id: 'budget', label: 'Budget' },
   { id: 'sports', label: 'Sports' },
+  { id: 'music', label: 'Music' },
 ];
 
 function useClock() {
