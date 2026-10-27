@@ -430,12 +430,25 @@ function findTransactionToHide_(sheet, merchantHint, amountHint) {
   // counts as a match.
   const normalizedMerchant = (merchantHint || '').toLowerCase().trim();
   const hintWords = normalizedMerchant.split(/\s+/).filter((w) => w.length > 2);
+  const hasMerchantHint = hintWords.length > 0;
+  const hasAmountHint = typeof amountHint === 'number';
   for (let i = data.length - 1; i >= 1; i--) {
     const rowMerchant = String(data[i][2] || '').toLowerCase();
     const rowAmount = Number(data[i][3]);
-    const merchantMatches = hintWords.some((w) => rowMerchant.indexOf(w) !== -1);
-    const amountMatches = typeof amountHint === 'number' && Math.abs(Math.abs(rowAmount) - amountHint) <= 0.01;
-    if (merchantMatches || amountMatches) return i + 1;
+    const merchantMatches = hasMerchantHint && hintWords.some((w) => rowMerchant.indexOf(w) !== -1);
+    const amountMatches = hasAmountHint && Math.abs(Math.abs(rowAmount) - amountHint) <= 0.01;
+    // When BOTH hints were given, require both to agree -- e.g. "hide the
+    // $45 charge at Amazon" means merchant AND amount, not either alone.
+    // An OR here would let a coincidental amount match on an unrelated row
+    // (a repeat charge amount, same risk the big comment above already
+    // documents for gas/subscription-style repeats) silently override a
+    // merchant mismatch and hide the wrong transaction -- exactly the
+    // false-positive this function's own "no match is now a real no-op"
+    // philosophy was meant to rule out, just not fully carried through to
+    // this two-hint case before. Only matters when both hints are present;
+    // a single hint still matches on that hint alone, unchanged.
+    const isMatch = hasMerchantHint && hasAmountHint ? merchantMatches && amountMatches : merchantMatches || amountMatches;
+    if (isMatch) return i + 1;
   }
   return -1; // a hint was given but nothing matched -- don't guess
 }
