@@ -18,6 +18,7 @@ import WeatherPage from './pages/WeatherPage';
 import BudgetPage from './pages/BudgetPage';
 import SportsPage from './pages/SportsPage';
 import MusicPage from './pages/MusicPage';
+import SolarPage from './pages/SolarPage';
 
 const PAGES = {
   home: Home,
@@ -30,6 +31,7 @@ const PAGES = {
   budget: BudgetPage,
   sports: SportsPage,
   music: MusicPage,
+  solar: SolarPage,
 };
 
 function Screen() {
