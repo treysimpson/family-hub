@@ -18,11 +18,12 @@ import WeatherPage from './pages/WeatherPage';
 import BudgetPage from './pages/BudgetPage';
 import SportsPage from './pages/SportsPage';
 import MusicPage from './pages/MusicPage';
-import DinnerPage from './pages/DinnerPage';
-// SolarPage is deliberately not wired into PAGES/nav below -- T-14 is
-// shelved (see family-hub-project.md's "Shelved for later" section).
-// src/pages/SolarPage.jsx and src/lib/solar.js are untouched and ready to
-// re-add with two lines here + the TopBar nav entry if it's ever revived.
+// SolarPage and DinnerPage are deliberately not wired into PAGES/nav below
+// -- T-14 and T-17/T-18 are both shelved (see family-hub-project.md's
+// "Shelved for later" section). src/pages/SolarPage.jsx, src/lib/solar.js,
+// src/pages/DinnerPage.jsx and src/lib/googleSheets.js's fetchRecipes are
+// all untouched and ready to re-add with two lines here + the TopBar nav
+// entry each, whenever either is revived.
 
 const PAGES = {
   home: Home,
@@ -35,7 +36,6 @@ const PAGES = {
   budget: BudgetPage,
   sports: SportsPage,
   music: MusicPage,
-  dinner: DinnerPage,
 };
 
 function Screen() {
