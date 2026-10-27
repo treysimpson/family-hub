@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { matchesTrackedTeam } from './sports';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { matchesTrackedTeam, getSportsSettings, saveSportsSettings } from './sports';
 
 function event(homeName, awayName) {
   return { home: { name: homeName, abbr: homeName.slice(0, 3).toUpperCase() }, away: { name: awayName, abbr: awayName.slice(0, 3).toUpperCase() } };
@@ -26,5 +26,30 @@ describe('matchesTrackedTeam', () => {
   it('matches if any one of several tracked names fits', () => {
     const e = event('Denver Broncos', 'Kansas City Chiefs');
     expect(matchesTrackedTeam(e, ['Avalanche', 'Broncos', 'Nuggets'])).toBe(true);
+  });
+});
+
+describe('getSportsSettings / saveSportsSettings', () => {
+  beforeEach(() => {
+    const store = new Map();
+    global.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    };
+  });
+
+  it('round-trips leagueIds/teamNames through localStorage', () => {
+    saveSportsSettings({ leagueIds: ['nfl', 'nhl'], teamNames: ['Broncos', 'Avalanche'] });
+    expect(getSportsSettings()).toEqual({ leagueIds: ['nfl', 'nhl'], teamNames: ['Broncos', 'Avalanche'] });
+  });
+
+  it('defaults to empty arrays with nothing saved yet', () => {
+    expect(getSportsSettings()).toEqual({ leagueIds: [], teamNames: [] });
+  });
+
+  it('saveSportsSettings fails soft rather than throwing when storage is blocked (private window, quota exceeded)', () => {
+    global.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    expect(() => saveSportsSettings({ leagueIds: ['nfl'], teamNames: [] })).not.toThrow();
   });
 });

@@ -37,7 +37,17 @@ export function getSportsSettings() {
 }
 
 export function saveSportsSettings(settings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Storage full or blocked (private window, etc.) -- same non-fatal
+    // reasoning as chores.js's save()/saveRedemptions()/saveChoreDefinitions():
+    // the settings still work for the session via React state, they just
+    // won't persist across a reload. Without this, SettingsPanel.jsx's
+    // toggleLeague/addTeam/removeTeam would throw uncaught from a plain
+    // onClick handler instead of failing soft like every other localStorage
+    // writer in this codebase.
+  }
 }
 
 function normalizeEvent(event) {
