@@ -9,12 +9,20 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [signingIn, setSigningIn] = useState(false);
   const refreshTimer = useRef(null);
+  // clearTimeout in signOut below only cancels a refresh that hasn't fired
+  // yet -- it can't stop one whose trySilentSignIn() is already in flight
+  // when the user clicks "Sign out". Without this flag, that renewal could
+  // resolve moments later and silently sign the user back in right after
+  // they explicitly signed out. Checked before applying a renewal result,
+  // reset on a fresh manual sign-in.
+  const signedOutRef = useRef(false);
 
   const scheduleRefresh = useCallback((expiresAt) => {
     clearTimeout(refreshTimer.current);
     const delay = Math.max(expiresAt - Date.now() - REFRESH_MARGIN_MS, 0);
     refreshTimer.current = setTimeout(async () => {
       const renewed = await trySilentSignIn();
+      if (signedOutRef.current) return;
       if (renewed) {
         setAccessToken(renewed.accessToken);
         scheduleRefresh(renewed.expiresAt);
@@ -41,6 +49,7 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async () => {
     setSigningIn(true);
     setAuthError(null);
+    signedOutRef.current = false;
     try {
       const token = await googleSignIn();
       setAccessToken(token.accessToken);
@@ -53,6 +62,7 @@ export function AuthProvider({ children }) {
   }, [scheduleRefresh]);
 
   const signOut = useCallback(() => {
+    signedOutRef.current = true;
     clearTimeout(refreshTimer.current);
     googleSignOut();
     setAccessToken(null);
