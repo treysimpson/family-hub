@@ -9,6 +9,11 @@ import { LEAGUES, fetchScoreboard, getSportsSettings, matchesTrackedTeam } from 
 // fetches most of the day).
 const SCORES_REFRESH_MS = 60 * 1000;
 
+// How many games show per league before it's collapsed behind a "N more"
+// tap -- keeps a multi-league day from burying the sidebar's one-glance
+// purpose under a wall of games nobody asked to see in full.
+const DEFAULT_VISIBLE_GAMES = 3;
+
 function formatGameTime(iso) {
   return new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 }
@@ -52,6 +57,19 @@ export default function SportsPage() {
   const [settings, setSettings] = useState(() => getSportsSettings());
   const [scoresByLeague, setScoresByLeague] = useState({});
   const [error, setError] = useState(null);
+  // Which leagues are tapped open to show every game, not just the first
+  // few -- starts empty (everything collapsed) each time the page mounts,
+  // same "resets on nav away and back" lifetime as the rest of this page's
+  // local state.
+  const [expandedLeagues, setExpandedLeagues] = useState(() => new Set());
+
+  const toggleLeagueExpanded = (id) => {
+    setExpandedLeagues((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Settings only change via the Settings panel (a separate component), so
   // re-read on focus/mount isn't enough -- but this page gets unmounted and
@@ -129,10 +147,22 @@ export default function SportsPage() {
             const league = LEAGUES.find((l) => l.id === id);
             // Already shown above in "Your teams" -- don't repeat it here.
             const events = (scoresByLeague[id] || []).filter((e) => !trackedIds.has(e.id));
+            const expanded = expandedLeagues.has(id);
+            const canExpand = events.length > DEFAULT_VISIBLE_GAMES;
+            const visibleEvents = expanded ? events : events.slice(0, DEFAULT_VISIBLE_GAMES);
             return (
               <div key={id}>
-                <div className="task-section-head">{league?.label}</div>
-                {events.map((e) => <GameRow key={e.id} event={e} />)}
+                <div
+                  className="task-section-head"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: canExpand ? 'pointer' : 'default' }}
+                  onClick={() => canExpand && toggleLeagueExpanded(id)}
+                >
+                  <span>{league?.label}</span>
+                  {canExpand && (
+                    <span>{expanded ? '▲ Show less' : `▼ ${events.length - DEFAULT_VISIBLE_GAMES} more`}</span>
+                  )}
+                </div>
+                {visibleEvents.map((e) => <GameRow key={e.id} event={e} />)}
                 {!events.length && (
                   <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No games today.</div>
                 )}
