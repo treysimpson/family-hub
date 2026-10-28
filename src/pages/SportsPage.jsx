@@ -115,29 +115,31 @@ export default function SportsPage() {
       </div>
 
       <div className="fp-main" style={{ overflow: 'hidden' }}>
-        {error && <div style={{ color: 'var(--ev-coral-tx)', marginBottom: '0.8em' }}>Couldn't load scores — {error}</div>}
+        <div className="task-scroll">
+          {error && <div style={{ color: 'var(--ev-coral-tx)', marginBottom: '0.8em' }}>Couldn't load scores — {error}</div>}
 
-        {!!trackedGames.length && (
-          <>
-            <div className="task-section-head">Your teams</div>
-            {trackedGames.map((e) => <GameRow key={e.id} event={e} />)}
-          </>
-        )}
+          {!!trackedGames.length && (
+            <>
+              <div className="task-section-head">Your teams</div>
+              {trackedGames.map((e) => <GameRow key={e.id} event={e} />)}
+            </>
+          )}
 
-        {settings.leagueIds.map((id) => {
-          const league = LEAGUES.find((l) => l.id === id);
-          // Already shown above in "Your teams" -- don't repeat it here.
-          const events = (scoresByLeague[id] || []).filter((e) => !trackedIds.has(e.id));
-          return (
-            <div key={id}>
-              <div className="task-section-head">{league?.label}</div>
-              {events.map((e) => <GameRow key={e.id} event={e} />)}
-              {!events.length && (
-                <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No games today.</div>
-              )}
-            </div>
-          );
-        })}
+          {settings.leagueIds.map((id) => {
+            const league = LEAGUES.find((l) => l.id === id);
+            // Already shown above in "Your teams" -- don't repeat it here.
+            const events = (scoresByLeague[id] || []).filter((e) => !trackedIds.has(e.id));
+            return (
+              <div key={id}>
+                <div className="task-section-head">{league?.label}</div>
+                {events.map((e) => <GameRow key={e.id} event={e} />)}
+                {!events.length && (
+                  <div style={{ color: 'var(--text-muted)', padding: '1em' }}>No games today.</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
